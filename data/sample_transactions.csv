@@ -1,0 +1,61 @@
+merchant_name,payment_type,note,category
+Foodpanda,Food,dinner delivery,Food & Dining
+Deliveroo,Food,lunch order,Food & Dining
+McDonald's,Food,meal,Food & Dining
+Koufu,Food,food court lunch,Food & Dining
+Starbucks,Food,coffee,Food & Dining
+Toast Box,Food,breakfast,Food & Dining
+ComfortDelGro,Transport,taxi home,Transport
+Gojek,Transport,ride to school,Transport
+SimplyGo,Transport,mrt commute,Transport
+MRT,Transport,train fare,Transport
+Grab Ride,Transport,airport ride,Transport
+CDG Zig,Transport,taxi booking,Transport
+Shopee,Shopping,online order,Shopping
+Lazada,Shopping,household purchase,Shopping
+Amazon,Shopping,online shopping,Shopping
+FairPrice,Shopping,weekly groceries,Shopping
+Uniqlo,Shopping,clothes,Shopping
+Popular,Shopping,stationery,Shopping
+SP Group,Bill,electricity bill,Utilities
+Geneco,Bill,power bill,Utilities
+Singtel,Bill,mobile plan,Utilities
+StarHub,Bill,broadband bill,Utilities
+M1,Bill,phone bill,Utilities
+PUB,Bill,water bill,Utilities
+Netflix,Subscription,monthly plan,Subscriptions
+Spotify,Subscription,music premium,Subscriptions
+Disney+,Subscription,streaming plan,Subscriptions
+YouTube Premium,Subscription,video membership,Subscriptions
+Apple iCloud,Subscription,cloud storage,Subscriptions
+Adobe,Subscription,software plan,Subscriptions
+SMU,Education,course fee,Education
+Coursera,Education,online course,Education
+Udemy,Education,programming course,Education
+NUS,Education,school fee,Education
+edX,Education,certificate course,Education
+Bookstore,Education,textbook,Education
+Guardian,Healthcare,medicine,Healthcare
+Watsons,Healthcare,pharmacy purchase,Healthcare
+Raffles Medical,Healthcare,clinic visit,Healthcare
+Polyclinic,Healthcare,consultation,Healthcare
+NTUC Health,Healthcare,health products,Healthcare
+Mount Elizabeth,Healthcare,medical appointment,Healthcare
+Landlord,Housing,monthly rent,Housing / Rent
+Rent,Housing,room rental,Housing / Rent
+HDB,Housing,service charge,Housing / Rent
+Condo Management,Housing,maintenance fee,Housing / Rent
+Property Agent,Housing,rental deposit,Housing / Rent
+Town Council,Housing,conservancy fee,Housing / Rent
+Cathay,Entertainment,movie tickets,Entertainment
+Golden Village,Entertainment,cinema,Entertainment
+Klook,Entertainment,attraction tickets,Entertainment
+Timezone,Entertainment,arcade,Entertainment
+Esplanade,Entertainment,show ticket,Entertainment
+SISTIC,Entertainment,concert ticket,Entertainment
+Unknown Shop,Others,miscellaneous,Others
+General Store,Others,unclear purchase,Others
+One Off Merchant,Others,other payment,Others
+Misc Service,Others,no category,Others
+Cash Payment,Others,personal payment,Others
+New Vendor,Others,unknown item,Others

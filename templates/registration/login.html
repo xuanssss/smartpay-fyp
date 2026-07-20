@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Log in · SmartPay{% endblock %}
+{% block content %}
+<div class="auth-wrap">
+  <div class="card border-0 shadow-lg auth-card">
+    <div class="card-body p-4 p-md-5">
+      <div class="text-center mb-4">
+        <div class="brand-mark brand-mark-lg mx-auto mb-3">S</div>
+        <h1 class="h3 fw-bold">Welcome to SmartPay</h1>
+        <p class="text-secondary mb-0">Your simulated payments, made clearer.</p>
+      </div>
+      <form method="post" novalidate>
+        {% csrf_token %}
+        {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+        {% for field in form %}
+          <div class="mb-3">
+            <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {{ field }}
+            {% for error in field.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+          </div>
+        {% endfor %}
+        <button class="btn btn-primary btn-lg w-100" type="submit">Log in</button>
+      </form>
+      <p class="text-center text-secondary mt-4 mb-0">New here? <a href="{% url 'register' %}">Create an account</a></p>
+      <div class="demo-hint mt-4"><strong>Demo:</strong> demo / demo12345</div>
+    </div>
+  </div>
+</div>
+{% endblock %}

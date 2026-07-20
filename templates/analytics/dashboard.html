@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Spending dashboard · SmartPay{% endblock %}
+{% block extra_head %}<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>{% endblock %}
+{% block content %}
+<div class="page-heading mb-4">
+  <p class="eyebrow text-primary mb-1">Your spending story</p>
+  <h1 class="h2 fw-bold">Spending dashboard</h1>
+  <p class="text-secondary mb-0">{{ month|date:"F Y" }}</p>
+</div>
+<div class="row g-3 mb-4">
+  <div class="col-12 col-md-7"><div class="hero-panel h-100"><small class="opacity-75">Total this month</small><div class="display-5 fw-bold mt-2">S${{ monthly_total|floatformat:2 }}</div>{% if month_change == None %}<span class="small">No previous-month comparison yet</span>{% elif month_change >= 0 %}<span class="change-pill change-up">↑ {{ month_change }}% from last month</span>{% else %}<span class="change-pill change-down">↓ {{ month_change_abs }}% from last month</span>{% endif %}</div></div>
+  <div class="col-6 col-md"><div class="metric-card h-100"><small>Previous month</small><strong class="fs-4">S${{ previous_total|floatformat:2 }}</strong></div></div>
+  <div class="col-6 col-md"><div class="metric-card h-100"><small>Active alerts</small><strong class="fs-4">{{ alert_summary.active }}</strong></div></div>
+</div>
+
+<div class="row g-4 mb-4">
+  <div class="col-lg-6"><div class="card content-card h-100"><div class="card-body p-4"><h2 class="h5 fw-bold">Spending by category</h2><p class="text-secondary small">Where your money went this month</p>{% if category_breakdown %}<div class="chart-wrap"><canvas id="categoryChart"></canvas></div>{% else %}<p class="empty-copy">Add payments to see your category chart.</p>{% endif %}</div></div></div>
+  <div class="col-lg-6"><div class="card content-card h-100"><div class="card-body p-4"><h2 class="h5 fw-bold">Monthly comparison</h2><p class="text-secondary small">This month compared with last month</p><div class="chart-wrap"><canvas id="monthChart"></canvas></div></div></div>
+</div>
+
+<div class="row g-4 mb-4">
+  <div class="col-lg-6"><div class="card content-card h-100"><div class="card-body p-4"><h2 class="h5 fw-bold mb-3">Top merchants</h2>{% for merchant in top_merchants %}<div class="rank-row"><span class="rank">{{ forloop.counter }}</span><div class="flex-grow-1"><strong>{{ merchant.merchant_name }}</strong><div class="small text-secondary">{{ merchant.count }} payment{{ merchant.count|pluralize }}</div></div><strong>S${{ merchant.total|floatformat:2 }}</strong></div>{% empty %}<p class="text-secondary">No spending this month.</p>{% endfor %}</div></div></div>
+  <div class="col-lg-6"><div class="card content-card h-100"><div class="card-body p-4"><h2 class="h5 fw-bold mb-3">Largest transactions</h2>{% for item in largest_transactions %}<a class="rank-row text-reset text-decoration-none" href="{% url 'transaction_detail' item.pk %}"><span class="merchant-avatar merchant-avatar-sm">{{ item.merchant_name|first|upper }}</span><div class="flex-grow-1 min-w-0"><strong class="d-block text-truncate">{{ item.merchant_name }}</strong><div class="small text-secondary">{{ item.final_category.name }}</div></div><strong>S${{ item.amount|floatformat:2 }}</strong></a>{% empty %}<p class="text-secondary">No spending this month.</p>{% endfor %}</div></div></div>
+</div>
+
+<div class="card content-card mb-4"><div class="card-body p-4">
+  <div class="d-flex justify-content-between align-items-center mb-3"><div><h2 class="h5 fw-bold mb-1">Recurring bills detected</h2><p class="text-secondary small mb-0">Similar payments across at least three different months</p></div><span class="badge text-bg-primary rounded-pill">{{ recurring_bills|length }}</span></div>
+  <div class="row g-3">{% for bill in recurring_bills %}<div class="col-md-6 col-xl-4"><div class="recurring-card"><div class="d-flex justify-content-between gap-2"><strong>{{ bill.merchant_name }}</strong><strong>S${{ bill.average_amount|floatformat:2 }}</strong></div><div class="text-secondary small mt-2">{{ bill.category.name }} · {{ bill.frequency_label }} · {{ bill.transaction_count }} payments</div></div></div>{% empty %}<div class="col"><p class="text-secondary mb-0">No recurring pattern has enough history yet.</p></div>{% endfor %}</div>
+</div></div>
+
+<div class="card content-card"><div class="card-body p-4"><h2 class="h5 fw-bold">High category spending insights</h2>{% for alert in high_spending_alerts %}<div class="alert-item border-start border-4 border-warning"><strong>{{ alert.title }}</strong><p class="small text-secondary mb-0 mt-1">{{ alert.message }}</p></div>{% empty %}<p class="text-secondary mb-0">No category increases currently need your attention.</p>{% endfor %}</div></div>
+
+{{ category_labels_json|json_script:"category-labels" }}
+{{ category_values_json|json_script:"category-values" }}
+{{ month_labels_json|json_script:"month-labels" }}
+{{ month_values_json|json_script:"month-values" }}
+{% endblock %}
+{% block scripts %}
+<script>
+  const readData = id => JSON.parse(document.getElementById(id).textContent);
+  const palette = ['#5267e8','#8b5cf6','#18a999','#f59e0b','#ef6461','#38bdf8','#ec4899','#84cc16','#f97316','#94a3b8'];
+  const categoryCanvas = document.getElementById('categoryChart');
+  if (categoryCanvas) new Chart(categoryCanvas, {type:'doughnut', data:{labels:readData('category-labels'),datasets:[{data:readData('category-values'),backgroundColor:palette,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'64%',plugins:{legend:{position:'bottom',labels:{usePointStyle:true,padding:16}}}}});
+  const monthCanvas = document.getElementById('monthChart');
+  if (monthCanvas) new Chart(monthCanvas, {type:'bar',data:{labels:readData('month-labels'),datasets:[{label:'Spending (S$)',data:readData('month-values'),backgroundColor:['#c7d2fe','#5267e8'],borderRadius:10}]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{beginAtZero:true,grid:{color:'#eef1f6'}},x:{grid:{display:false}}},plugins:{legend:{display:false}}}});
+</script>
+{% endblock %}

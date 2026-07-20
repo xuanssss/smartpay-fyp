@@ -1,0 +1,55 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#3957d6">
+  <title>{% block title %}SmartPay Insights{% endblock %}</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+  {% if user.is_authenticated %}
+  <nav class="navbar navbar-expand-lg bg-white border-bottom sticky-top shadow-sm">
+    <div class="container app-shell">
+      <a class="navbar-brand fw-bold text-primary" href="{% url 'home' %}"><span class="brand-mark">S</span> SmartPay</a>
+      <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" aria-label="Open navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="mainNav">
+        <div class="navbar-nav ms-auto align-items-lg-center gap-lg-1">
+          <a class="nav-link" href="{% url 'home' %}">Home</a>
+          <a class="nav-link" href="{% url 'create_payment' %}">Pay</a>
+          <a class="nav-link" href="{% url 'transaction_history' %}">Transactions</a>
+          <a class="nav-link" href="{% url 'dashboard' %}">Dashboard</a>
+          <a class="nav-link" href="{% url 'alert_list' %}">Alerts{% if navbar_active_alert_count %} <span class="badge rounded-pill text-bg-danger">{{ navbar_active_alert_count }}</span>{% endif %}</a>
+          <form method="post" action="{% url 'logout' %}" class="ms-lg-2">
+            {% csrf_token %}
+            <button class="btn btn-sm btn-outline-secondary w-100" type="submit">Log out</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </nav>
+  {% endif %}
+
+  <main class="container app-shell py-4 pb-5">
+    {% if messages %}
+      {% for message in messages %}
+        <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      {% endfor %}
+    {% endif %}
+    {% block content %}{% endblock %}
+  </main>
+  <footer class="container app-shell text-center text-secondary small pb-4">
+    Simulated FYP prototype — no real payments are processed.
+  </footer>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

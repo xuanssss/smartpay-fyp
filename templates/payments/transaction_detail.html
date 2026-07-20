@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}{{ transaction.merchant_name }} · SmartPay{% endblock %}
+{% block content %}
+<a class="back-link" href="{% url 'transaction_history' %}">‹ Back to transactions</a>
+<section class="detail-hero mt-3 mb-4 text-center">
+  <div class="merchant-avatar merchant-avatar-lg mx-auto">{{ transaction.merchant_name|first|upper }}</div>
+  <h1 class="h3 fw-bold mt-3 mb-1">{{ transaction.merchant_name }}</h1>
+  <div class="display-6 fw-bold">S${{ transaction.amount|floatformat:2 }}</div>
+  <p class="text-secondary mb-0">{{ transaction.transaction_date|date:"j F Y, g:i A" }}</p>
+</section>
+<div class="row g-4">
+  <div class="col-lg-7">
+    <div class="card content-card mb-4"><div class="card-body p-4">
+      <div class="detail-row"><span>Payment type</span><strong>{{ transaction.payment_type }}</strong></div>
+      <div class="detail-row"><span>Predicted category</span><strong>{{ transaction.predicted_category.name }}</strong></div>
+      <div class="detail-row"><span>Final category</span><strong>{{ transaction.final_category.name }}</strong></div>
+      <div class="detail-row"><span>Confidence score</span><strong>{{ transaction.confidence_score|floatformat:2 }} / 1.00</strong></div>
+      <div class="detail-row"><span>Confidence</span><span class="confidence confidence-{{ transaction.confidence_label|lower }}">{{ transaction.confidence_label }}</span></div>
+      <div class="detail-row"><span>User corrected</span><strong>{{ transaction.user_corrected|yesno:"Yes,No" }}</strong></div>
+      {% if transaction.note %}<div class="detail-row"><span>Note</span><strong>{{ transaction.note }}</strong></div>{% endif %}
+      <a class="btn btn-outline-primary w-100 mt-3" href="{% url 'change_category' transaction.pk %}">Change category</a>
+    </div></div>
+    <div class="card content-card" id="reason"><div class="card-body p-4">
+      <p class="eyebrow text-primary mb-2">Why this category?</p>
+      <h2 class="h5">Reason</h2><p class="mb-3">{{ transaction.category_explanation }}</p>
+      <div class="soft-note"><strong>Confidence: {{ transaction.confidence_label }}</strong><br><span class="small">Confidence describes how strongly the available information supported this suggestion.</span></div>
+    </div></div>
+  </div>
+  <div class="col-lg-5">
+    <div class="card content-card"><div class="card-body p-4">
+      <h2 class="h5 fw-bold">Needs attention</h2>
+      {% for alert in transaction.alerts.all %}
+        <div class="alert-item border-start border-4 {% if alert.severity == 'High' %}border-danger{% elif alert.severity == 'Medium' %}border-warning{% else %}border-info{% endif %}">
+          <strong>{{ alert.title }}</strong><div class="small text-secondary mt-1">{{ alert.message }}</div><span class="badge text-bg-light mt-2">{{ alert.status }}</span>
+        </div>
+      {% empty %}<p class="text-secondary mb-0">No alerts are linked to this payment.</p>{% endfor %}
+    </div></div>
+  </div>
+</div>
+{% endblock %}
