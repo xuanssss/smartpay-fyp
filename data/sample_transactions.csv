@@ -1,61 +1,67 @@
 merchant_name,payment_type,note,category
-Foodpanda,Food,dinner delivery,Food & Dining
-Deliveroo,Food,lunch order,Food & Dining
-McDonald's,Food,meal,Food & Dining
-Koufu,Food,food court lunch,Food & Dining
-Starbucks,Food,coffee,Food & Dining
-Toast Box,Food,breakfast,Food & Dining
-ComfortDelGro,Transport,taxi home,Transport
-Gojek,Transport,ride to school,Transport
-SimplyGo,Transport,mrt commute,Transport
-MRT,Transport,train fare,Transport
-Grab Ride,Transport,airport ride,Transport
-CDG Zig,Transport,taxi booking,Transport
-Shopee,Shopping,online order,Shopping
-Lazada,Shopping,household purchase,Shopping
-Amazon,Shopping,online shopping,Shopping
-FairPrice,Shopping,weekly groceries,Shopping
-Uniqlo,Shopping,clothes,Shopping
-Popular,Shopping,stationery,Shopping
-SP Group,Bill,electricity bill,Utilities
-Geneco,Bill,power bill,Utilities
-Singtel,Bill,mobile plan,Utilities
-StarHub,Bill,broadband bill,Utilities
-M1,Bill,phone bill,Utilities
-PUB,Bill,water bill,Utilities
-Netflix,Subscription,monthly plan,Subscriptions
-Spotify,Subscription,music premium,Subscriptions
-Disney+,Subscription,streaming plan,Subscriptions
-YouTube Premium,Subscription,video membership,Subscriptions
-Apple iCloud,Subscription,cloud storage,Subscriptions
-Adobe,Subscription,software plan,Subscriptions
-SMU,Education,course fee,Education
-Coursera,Education,online course,Education
-Udemy,Education,programming course,Education
-NUS,Education,school fee,Education
-edX,Education,certificate course,Education
-Bookstore,Education,textbook,Education
-Guardian,Healthcare,medicine,Healthcare
-Watsons,Healthcare,pharmacy purchase,Healthcare
-Raffles Medical,Healthcare,clinic visit,Healthcare
-Polyclinic,Healthcare,consultation,Healthcare
-NTUC Health,Healthcare,health products,Healthcare
-Mount Elizabeth,Healthcare,medical appointment,Healthcare
-Landlord,Housing,monthly rent,Housing / Rent
-Rent,Housing,room rental,Housing / Rent
-HDB,Housing,service charge,Housing / Rent
-Condo Management,Housing,maintenance fee,Housing / Rent
-Property Agent,Housing,rental deposit,Housing / Rent
-Town Council,Housing,conservancy fee,Housing / Rent
-Cathay,Entertainment,movie tickets,Entertainment
-Golden Village,Entertainment,cinema,Entertainment
-Klook,Entertainment,attraction tickets,Entertainment
-Timezone,Entertainment,arcade,Entertainment
-Esplanade,Entertainment,show ticket,Entertainment
-SISTIC,Entertainment,concert ticket,Entertainment
-Unknown Shop,Others,miscellaneous,Others
-General Store,Others,unclear purchase,Others
-One Off Merchant,Others,other payment,Others
-Misc Service,Others,no category,Others
-Cash Payment,Others,personal payment,Others
-New Vendor,Others,unknown item,Others
+Amazon SG,Shopping,online marketplace order,Online Shopping
+AMZN Marketplace SG,Shopping,electronics order,Online Shopping
+Amazon Singapore,Shopping,book purchase,Online Shopping
+SP Group,Bill,electricity bill,Bills
+Singtel,Bill,mobile phone bill,Bills
+StarHub,Bill,broadband bill,Bills
+Uniqlo,Shopping,clothing purchase,Clothing
+Love Bonito,Shopping,dress purchase,Clothing
+Cotton On,Shopping,apparel purchase,Clothing
+Foodpanda,Food,dinner delivery,Dining
+Koufu,Food,food court lunch,Dining
+Toast Box,Food,breakfast purchase,Dining
+Starbucks,Food,coffee purchase,Dining
+Golden Village,Entertainment,cinema ticket,Entertainment
+Shaw Theatres,Entertainment,movie ticket,Entertainment
+Ticketmaster SG,Entertainment,concert ticket,Entertainment
+Netflix,Subscription,streaming subscription,Entertainment
+ActiveSG,Fitness,gym entry,Fitness
+Anytime Fitness,Fitness,monthly gym membership,Fitness
+Fitness First,Fitness,fitness membership,Fitness
+Tekka Market,Shopping,fresh produce purchase,Groceries
+Tiong Bahru Market,Shopping,fish stall purchase,Groceries
+Geylang Serai Market,Shopping,market food purchase,Groceries
+FairPrice,Shopping,weekly groceries,Groceries
+Sheng Siong,Shopping,supermarket groceries,Groceries
+Cold Storage,Shopping,grocery purchase,Groceries
+RedMart,Shopping,grocery delivery,Groceries
+Raffles Medical,Healthcare,clinic consultation,Healthcare
+Guardian Pharmacy,Healthcare,medication purchase,Healthcare
+Polyclinic,Healthcare,medical consultation,Healthcare
+IKEA Singapore,Shopping,home furnishings,Home Improvement
+HardwareCity,Shopping,hardware purchase,Home Improvement
+Gain City,Shopping,home appliance purchase,Home Improvement
+Marina Bay Sands,Others,hotel room booking,Accommodation
+Parkroyal Collection,Others,hotel stay,Accommodation
+Village Hotel,Others,accommodation payment,Accommodation
+Income Insurance,Bill,insurance premium,Insurance
+Great Eastern,Bill,life insurance premium,Insurance
+Singlife,Bill,policy premium,Insurance
+Shopee SG,Shopping,online retail order,Online Shopping
+Lazada Singapore,Shopping,marketplace purchase,Online Shopping
+Challenger,Shopping,electronics purchase,Shopping
+Popular Bookstore,Shopping,stationery purchase,Shopping
+General Store,Others,miscellaneous retail purchase,Other
+One Off Vendor,Others,unclear debit purchase,Other
+Unknown Merchant,Others,unclassified purchase,Other
+Vodien,Others,domain registration,Services
+Exabytes SG,Others,website domain purchase,Services
+SGNIC,Others,dot sg domain renewal,Services
+Coursera,Education,online course,Services
+Udemy,Education,skills course,Services
+CloudBox,Subscription,cloud storage service,Services
+QB House,Others,haircut service,Services
+HomeFix Services,Housing,plumbing repair service,Home Improvement
+CleanHome,Housing,home cleaning service,Home Improvement
+CoolCare,Housing,aircon servicing,Home Improvement
+BrightSpark Electrical,Housing,electrical repair service,Home Improvement
+ComfortDelGro,Transport,taxi ride,Private Hire & Taxis
+Gojek,Transport,private hire ride,Private Hire & Taxis
+Grab Ride,Transport,airport private hire ride,Private Hire & Taxis
+SimplyGo,Transport,mrt fare,Public Transport
+SBS Transit,Transport,bus fare,Public Transport
+SMRT,Transport,train fare,Public Transport
+Singapore Airlines,Transport,flight booking,Travel & Holidays
+Scoot,Transport,air ticket purchase,Travel & Holidays
+Klook,Transport,holiday tour booking,Travel & Holidays

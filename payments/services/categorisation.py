@@ -3,8 +3,13 @@ from pathlib import Path
 
 from django.conf import settings
 
-from payments.models import Category, MerchantRule
+from payments.models import Category, Transaction
+from .domain_rules import match_high_confidence_rule
 from .ml_categorisation import predict_category as ml_predict_category
+
+
+class CategorisationUnavailable(RuntimeError):
+    """Raised when the hybrid categorisation service cannot make a prediction."""
 
 
 @dataclass(frozen=True)
@@ -14,69 +19,93 @@ class CategorisationResult:
     explanation: str
     source: str
 
-
-PAYMENT_TYPE_CATEGORIES = {
-    "Food": "Food & Dining",
-    "Transport": "Transport",
-    "Shopping": "Shopping",
-    "Bill": "Utilities",
-    "Subscription": "Subscriptions",
-    "Education": "Education",
-    "Healthcare": "Healthcare",
-    "Housing": "Housing / Rent",
-    "Entertainment": "Entertainment",
-}
+    @property
+    def confidence_label(self):
+        if self.confidence >= 0.85:
+            return "High"
+        if self.confidence >= 0.60:
+            return "Medium"
+        return "Low"
 
 
-def _normalise(value):
-    return " ".join((value or "").casefold().replace("’", "'").split())
+def categorise_transaction(
+    merchant_name,
+    payment_type="Others",
+    note="",
+    item_name="",
+    transaction_description="",
+    *,
+    amount=None,
+    transaction_date=None,
+    transaction_type=None,
+):
+    """Apply a narrow high-confidence rule layer, then the fitted SVM."""
+    del payment_type, note
 
-
-def categorise_transaction(merchant_name, payment_type="Others", note=""):
-    merchant = _normalise(merchant_name)
-    searchable = _normalise(f"{merchant_name} {payment_type} {note}")
-
-    rules = MerchantRule.objects.select_related("category").order_by("-confidence_score", "-keyword")
-    exact_matches = [rule for rule in rules if merchant == _normalise(rule.keyword)]
-    if exact_matches:
-        rule = exact_matches[0]
-        # TODO-FYP-TWEAK: Exact-rule confidence stays within the documented 0.90–0.99 band.
-        confidence = max(0.90, min(rule.confidence_score, 0.99))
-        return CategorisationResult(rule.category, confidence, rule.explanation_template, "exact_rule")
-
-    keyword_matches = [rule for rule in rules if _normalise(rule.keyword) in searchable]
-    if keyword_matches:
-        rule = keyword_matches[0]
-        # TODO-FYP-TWEAK: Keyword confidence is capped below exact-rule confidence.
-        confidence = min(rule.confidence_score, 0.89)
-        return CategorisationResult(rule.category, confidence, rule.explanation_template, "keyword_rule")
+    rule_match = match_high_confidence_rule(
+        merchant_name=merchant_name,
+        item_name=item_name,
+        transaction_description=transaction_description,
+    )
+    if rule_match:
+        category = Category.objects.filter(
+            name=rule_match.category_name, is_active=True
+        ).first()
+        if category:
+            return CategorisationResult(
+                category=category,
+                confidence=rule_match.confidence,
+                explanation=rule_match.explanation,
+                source=rule_match.source,
+            )
 
     model_path = Path(settings.BASE_DIR) / "models" / "transaction_classifier.joblib"
-    if model_path.exists():
-        prediction = ml_predict_category(merchant_name, payment_type, note, model_path=model_path)
-        if prediction:
-            category = Category.objects.filter(name=prediction["category"]).first()
-            if category:
-                return CategorisationResult(
-                    category,
-                    max(0.40, min(float(prediction["confidence"]), 0.89)),
-                    "The trained categorisation model found similar wording in the sample transaction data.",
-                    "ml",
-                )
-
-    fallback_name = PAYMENT_TYPE_CATEGORIES.get(payment_type)
-    if fallback_name:
-        category = Category.objects.get(name=fallback_name)
-        # TODO-FYP-TWEAK: Payment-type fallback confidence defaults to 0.60.
-        return CategorisationResult(
-            category, 0.60,
-            f"No strong merchant rule was found, so the selected payment type ({payment_type}) was used.",
-            "payment_type",
+    if not model_path.exists():
+        raise CategorisationUnavailable(
+            "The SVM categorisation model is unavailable. Run "
+            "'python manage.py train_transaction_model' first."
+        )
+    missing_inputs = [
+        name
+        for name, value in (
+            ("amount", amount),
+            ("transaction_date", transaction_date),
+            ("transaction_type", transaction_type),
+        )
+        if value is None or value == ""
+    ]
+    if missing_inputs:
+        raise CategorisationUnavailable(
+            "SVM categorisation requires: " + ", ".join(missing_inputs)
         )
 
-    others = Category.objects.get(name="Others")
+    model_description = " ".join(
+        filter(None, (merchant_name, item_name, transaction_description))
+    )
+    prediction = ml_predict_category(
+        description=model_description,
+        transaction_type=transaction_type,
+        amount_sgd=amount,
+        transaction_date=transaction_date,
+        model_path=model_path,
+    )
+    if not prediction:
+        raise CategorisationUnavailable("The SVM did not return a prediction.")
+
+    category = Category.objects.filter(
+        name=prediction["category"], is_active=True
+    ).first()
+    if category is None:
+        raise CategorisationUnavailable(
+            f"The SVM predicted inactive or unknown category: {prediction['category']}"
+        )
+
     return CategorisationResult(
-        others, 0.40,
-        "No strong merchant rule was found, so this transaction was placed under Others.",
-        "unknown",
+        category=category,
+        confidence=float(prediction["confidence"]),
+        explanation=(
+            "The SVM compared the cleaned description, transaction type, "
+            "relative amount, and day-of-month with its training data."
+        ),
+        source=Transaction.CategorisationSource.ML,
     )

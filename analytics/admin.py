@@ -1,5 +1,4 @@
 from django.contrib import admin
-from .models import PerformanceLog, RecurringBill
-
-admin.site.register(RecurringBill)
+from .models import MonthlyBudget, PerformanceLog
+admin.site.register(MonthlyBudget)
 admin.site.register(PerformanceLog)

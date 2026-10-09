@@ -7,14 +7,14 @@ from payments.services.ml_categorisation import evaluate_model
 
 
 class Command(BaseCommand):
-    help = "Evaluate the saved transaction categorisation model."
+    help = "Re-evaluate the saved MoneyVis SVM on its reproducible 20% holdout."
 
     def handle(self, *args, **options):
-        csv_path = Path(settings.BASE_DIR) / "data" / "sample_transactions.csv"
+        csv_path = Path(settings.BASE_DIR) / "data" / "moneyvis_singapore_quality_checked.csv"
         model_path = Path(settings.BASE_DIR) / "models" / "transaction_classifier.joblib"
         try:
-            metrics = evaluate_model(csv_path, model_path)
-        except FileNotFoundError as exc:
+            metrics = evaluate_model(csv_path, model_path, test_size=0.20)
+        except (FileNotFoundError, ValueError) as exc:
             raise CommandError(str(exc)) from exc
         self.stdout.write("Saved model evaluation")
         self.stdout.write(f"Accuracy:  {metrics['accuracy']:.4f}")

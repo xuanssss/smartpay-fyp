@@ -1,0 +1,237 @@
+{% extends "base.html" %}
+{% block title %}Category Analysis · SmartPay{% endblock %}
+{% block extra_head %}<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>{% endblock %}
+{% block content %}
+{% include "analytics/_dashboard_nav.html" %}
+
+<header class="dashboard-page-header"><div><p class="page-kicker">SmartPay / Dashboard</p><h1>Category Analysis</h1><p>Select a category to explore its merchants and payments.</p></div></header>
+
+<div class="analysis-filter-trail" id="analysisFilterTrail" hidden>
+  <span>Filtered by</span>
+  <button type="button" id="clearCategoryFilter"><strong id="activeCategoryName"></strong><b aria-hidden="true">×</b><span class="visually-hidden">Clear category filter</span></button>
+</div>
+
+<section class="dashboard-card interactive-category-card">
+  <div class="dashboard-card-heading"><div><p class="page-kicker">Category breakdown</p><h2>Where your money went</h2><small>Select a category to view its merchants and its analysis below.</small></div></div>
+  {% if category_breakdown %}
+  <div class="interactive-category-layout">
+    <div class="interactive-chart-wrap">
+      <canvas id="categoryChart" aria-label="Category spending chart"></canvas>
+      <div class="category-chart-centre" aria-live="polite"><span id="categoryCentreName">All spending</span><strong id="categoryCentreAmount">S${{ monthly_summary.total|floatformat:2 }}</strong><small id="categoryCentreShare">100% of spending</small></div>
+    </div>
+    <div class="category-interaction-list" aria-label="Spending categories">
+      {% for category in category_breakdown %}
+      <div class="category-interaction-item">
+        <button type="button" class="category-interaction-row" data-category-index="{{ forloop.counter0 }}" data-category-name="{{ category.final_category__name }}" aria-expanded="false" aria-controls="category-merchants-{{ forloop.counter0 }}">
+          <span class="category-colour-dot" aria-hidden="true"></span>
+          <span class="category-row-name"><strong>{{ category.final_category__name }}</strong><small>{{ category.count }} payment{{ category.count|pluralize }}</small></span>
+          <span class="category-row-value"><strong>S${{ category.total|floatformat:2 }}</strong><small>{{ category.share_percent }}% of spending</small></span>
+        </button>
+        <div class="category-merchant-dropdown" id="category-merchants-{{ forloop.counter0 }}" hidden></div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% else %}<p class="empty-copy">No spending recorded for this month.</p>{% endif %}
+</section>
+
+{% if category_breakdown %}
+<div class="cross-filter-grid mt-4">
+  <section class="dashboard-card cross-filter-time-card">
+    <div class="dashboard-card-heading"><div><p class="page-kicker">Spending over time</p><h2 id="timelineTitle">All spending</h2><small>Daily payments during {{ month|date:"F Y" }}.</small></div></div>
+    <div class="cross-filter-chart-wrap"><canvas id="categoryTimelineChart" aria-label="Filtered spending over time"></canvas></div>
+  </section>
+
+  <section class="dashboard-card cross-filter-change-card">
+    <div class="dashboard-card-heading"><div><p class="page-kicker">What changed</p><h2 id="changeTitle">Monthly comparison</h2><small id="changeComparisonLabel">Compared with {{ comparison.label }}.</small></div></div>
+    <div class="cross-filter-change-summary" id="changeSummary">
+      <span class="change-arrow" id="changeArrow" aria-hidden="true">→</span>
+      <div><strong id="changeAmount">No change</strong><p id="changeCopy">Spending is unchanged.</p></div>
+    </div>
+  </section>
+
+</div>
+{% endif %}
+
+<div class="merchant-drawer-backdrop" id="merchantDrawerBackdrop" hidden></div>
+<aside class="merchant-drawer" id="merchantDrawer" role="dialog" aria-modal="true" aria-labelledby="merchantDrawerTitle" hidden>
+  <div class="merchant-drawer-header">
+    <div><p class="page-kicker" id="merchantDrawerTrail">Category / Merchant</p><h2 id="merchantDrawerTitle">Merchant</h2><p id="merchantDrawerSummary"></p></div>
+    <button type="button" class="merchant-drawer-close" id="merchantDrawerClose" aria-label="Close merchant details">×</button>
+  </div>
+  <section class="merchant-history-panel">
+    <div><strong>Historical spending</strong><small>Past 12 months</small></div>
+    <div class="merchant-history-chart-wrap"><canvas id="merchantHistoryChart" aria-label="Merchant historical spending"></canvas></div>
+  </section>
+  <section class="merchant-transactions">
+    <div class="merchant-drawer-section-heading"><strong id="merchantTransactionHeading">Transactions</strong></div>
+    <div id="merchantTransactionList"></div>
+  </section>
+</aside>
+
+{{ category_labels_json|json_script:"category-labels" }}
+{{ category_values_json|json_script:"category-values" }}
+{{ category_shares_json|json_script:"category-shares" }}
+{{ cross_filter_data|json_script:"cross-filter-data" }}
+{% endblock %}
+{% block scripts %}
+<script>
+  const categoryCanvas = document.getElementById('categoryChart');
+  if (categoryCanvas) {
+    const labels = JSON.parse(document.getElementById('category-labels').textContent);
+    const values = JSON.parse(document.getElementById('category-values').textContent);
+    const shares = JSON.parse(document.getElementById('category-shares').textContent);
+    const crossFilter = JSON.parse(document.getElementById('cross-filter-data').textContent);
+    const palette = ['#000080','#e85d3f','#008f7a','#c93672','#f2a900','#6446c7','#0077b6','#bd1e1e','#4d908e','#9c6644','#5c677d','#ff7b00'];
+    const money = value => `S$${Number(value).toLocaleString('en-SG', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+    const rows = Array.from(document.querySelectorAll('.category-interaction-row'));
+    const centreName = document.getElementById('categoryCentreName');
+    const centreAmount = document.getElementById('categoryCentreAmount');
+    const centreShare = document.getElementById('categoryCentreShare');
+    const filterTrail = document.getElementById('analysisFilterTrail');
+    const activeCategoryName = document.getElementById('activeCategoryName');
+    const timelineTitle = document.getElementById('timelineTitle');
+    const changeTitle = document.getElementById('changeTitle');
+    const changeArrow = document.getElementById('changeArrow');
+    const changeAmount = document.getElementById('changeAmount');
+    const changeCopy = document.getElementById('changeCopy');
+    const merchantDropdowns = Array.from(document.querySelectorAll('.category-merchant-dropdown'));
+    const drawer = document.getElementById('merchantDrawer');
+    const drawerBackdrop = document.getElementById('merchantDrawerBackdrop');
+    const drawerClose = document.getElementById('merchantDrawerClose');
+    let selectedCategory = null;
+    let categoryChart;
+    let timelineChart;
+    let merchantHistoryChart;
+
+    rows.forEach((row, index) => row.style.setProperty('--category-colour', palette[index % palette.length]));
+
+    const makeElement = (tag, className, text) => {
+      const element = document.createElement(tag);
+      if (className) element.className = className;
+      if (text !== undefined) element.textContent = text;
+      return element;
+    };
+
+    const updateChange = view => {
+      const difference = Number(view.difference);
+      const direction = view.direction;
+      changeTitle.textContent = selectedCategory || 'All spending';
+      changeArrow.textContent = direction === 'up' ? '↑' : direction === 'down' ? '↓' : '→';
+      changeArrow.className = `change-arrow change-${direction}`;
+      changeAmount.className = direction === 'up' ? 'text-attention' : direction === 'down' ? 'text-positive' : '';
+      changeAmount.textContent = difference === 0 ? 'No change' : `${direction === 'up' ? '+' : '−'}${money(Math.abs(difference))}`;
+      changeCopy.textContent = `${money(view.previous_total)} during the ${crossFilter.comparison_label}.`;
+    };
+
+    const closeDrawer = () => {
+      drawer.hidden = true;
+      drawerBackdrop.hidden = true;
+      document.body.classList.remove('drawer-open');
+      if (merchantHistoryChart) merchantHistoryChart.destroy();
+      merchantHistoryChart = null;
+    };
+
+    const openMerchant = merchantKey => {
+      const merchant = crossFilter.merchants[merchantKey];
+      if (!merchant) return;
+      document.getElementById('merchantDrawerTrail').textContent = `${merchant.category} / ${merchant.name}`;
+      document.getElementById('merchantDrawerTitle').textContent = merchant.name;
+      document.getElementById('merchantDrawerSummary').textContent = `${merchant.count} payment${merchant.count === 1 ? '' : 's'} this month · ${money(merchant.total)}`;
+      document.getElementById('merchantTransactionHeading').textContent = `This month: ${merchant.transactions.length} transaction${merchant.transactions.length === 1 ? '' : 's'}`;
+      const transactionList = document.getElementById('merchantTransactionList');
+      transactionList.replaceChildren();
+      merchant.transactions.forEach(transaction => {
+        const row = makeElement('div', 'merchant-transaction-row');
+        row.append(
+          makeElement('span', '', transaction.date),
+          makeElement('strong', '', transaction.description),
+          makeElement('b', '', money(transaction.amount))
+        );
+        transactionList.append(row);
+      });
+      drawer.hidden = false;
+      drawerBackdrop.hidden = false;
+      document.body.classList.add('drawer-open');
+      if (merchantHistoryChart) merchantHistoryChart.destroy();
+      merchantHistoryChart = new Chart(document.getElementById('merchantHistoryChart'), {
+        type: 'line',
+        data: {labels: merchant.history_labels, datasets: [{data: merchant.history_values, borderColor:'#000080', backgroundColor:'rgba(0,0,128,.08)', borderWidth:2.25, pointRadius:2.5, pointHoverRadius:5, tension:.3, fill:true}]},
+        options: {responsive:true,maintainAspectRatio:false,scales:{y:{beginAtZero:true,border:{display:false},grid:{color:'rgba(0,0,128,.07)'},ticks:{callback:value=>'S$'+value}},x:{border:{display:false},grid:{display:false},ticks:{maxTicksLimit:4}}},plugins:{legend:{display:false},tooltip:{callbacks:{label:context=>money(context.raw)}}}}
+      });
+      drawerClose.focus();
+    };
+
+    const renderMerchants = view => {
+      merchantDropdowns.forEach(dropdown => {
+        dropdown.hidden = true;
+        dropdown.replaceChildren();
+      });
+      if (!selectedCategory) return;
+      const selectedRow = rows.find(row => row.dataset.categoryName === selectedCategory);
+      const merchantList = selectedRow?.nextElementSibling;
+      if (!merchantList) return;
+      merchantList.hidden = false;
+      if (!view.merchants.length) {
+        merchantList.append(makeElement('p', 'empty-copy compact', 'No merchants in this category for the selected month.'));
+        return;
+      }
+      view.merchants.forEach(merchant => {
+        const button = makeElement('button', 'merchant-filter-row');
+        button.type = 'button';
+        const initial = makeElement('span', 'merchant-filter-initial', merchant.name.slice(0, 1).toUpperCase());
+        const copy = makeElement('span', 'merchant-filter-copy');
+        copy.append(makeElement('strong', '', merchant.name), makeElement('small', '', `${merchant.count} payment${merchant.count === 1 ? '' : 's'}`));
+        const value = makeElement('span', 'merchant-filter-value');
+        value.append(makeElement('strong', '', money(merchant.total)), makeElement('small', '', 'View history'));
+        button.append(initial, copy, value);
+        button.addEventListener('click', () => openMerchant(merchant.key));
+        merchantList.append(button);
+      });
+    };
+
+    const selectCategory = name => {
+      selectedCategory = name;
+      const view = name ? crossFilter.categories[name] : crossFilter.all;
+      const selectedIndex = name ? labels.indexOf(name) : -1;
+      rows.forEach(row => {
+        const isActive = row.dataset.categoryName === name;
+        row.classList.toggle('active', isActive);
+        row.setAttribute('aria-expanded', String(isActive));
+      });
+      filterTrail.hidden = !name;
+      activeCategoryName.textContent = name || '';
+      centreName.textContent = name || 'All spending';
+      centreAmount.textContent = money(view.total);
+      centreShare.textContent = name ? `${Number(view.share).toFixed(1)}% of spending` : '100% of spending';
+      timelineTitle.textContent = name || 'All spending';
+      categoryChart.setActiveElements(selectedIndex >= 0 ? [{datasetIndex:0,index:selectedIndex}] : []);
+      categoryChart.update('none');
+      timelineChart.data.datasets[0].data = view.daily_values;
+      timelineChart.data.datasets[0].label = name || 'All spending';
+      timelineChart.update();
+      updateChange(view);
+      renderMerchants(view);
+    };
+
+    categoryChart = new Chart(categoryCanvas, {
+      type: 'doughnut',
+      data: {labels, datasets: [{data: values, backgroundColor: labels.map((_, index) => palette[index % palette.length]), borderWidth:3, borderColor:'#fff', hoverOffset:8}]},
+      options: {responsive:true,maintainAspectRatio:false,cutout:'69%',onClick:(_,elements)=>{if(elements.length)selectCategory(labels[elements[0].index]);},plugins:{legend:{display:false},tooltip:{enabled:true,backgroundColor:"#17172b",titleColor:"#fff",bodyColor:"#fff",displayColors:false,padding:12,cornerRadius:8,caretPadding:8,callbacks:{label:context=>money(context.raw)+" ("+Number(shares[context.dataIndex]).toFixed(1)+"% of spending)"}}}}
+    });
+
+    timelineChart = new Chart(document.getElementById('categoryTimelineChart'), {
+      type:'line',
+      data:{labels:crossFilter.day_labels,datasets:[{label:'All spending',data:crossFilter.all.daily_values,borderColor:'#000080',backgroundColor:'rgba(0,0,128,.08)',borderWidth:2.5,pointRadius:2.5,pointHoverRadius:5,tension:.3,fill:true}]},
+      options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},scales:{y:{beginAtZero:true,border:{display:false},grid:{color:'rgba(0,0,128,.07)'},ticks:{callback:value=>'S$'+value}},x:{border:{display:false},grid:{display:false},ticks:{maxTicksLimit:7}}},plugins:{legend:{display:false},tooltip:{callbacks:{label:context=>money(context.raw)}}}}
+    });
+
+    rows.forEach(row => row.addEventListener('click', () => selectCategory(selectedCategory === row.dataset.categoryName ? null : row.dataset.categoryName)));
+    document.getElementById('clearCategoryFilter').addEventListener('click', () => selectCategory(null));
+    drawerClose.addEventListener('click', closeDrawer);
+    drawerBackdrop.addEventListener('click', closeDrawer);
+    document.addEventListener('keydown', event => { if (event.key === 'Escape' && !drawer.hidden) closeDrawer(); });
+    selectCategory(null);
+  }
+</script>
+{% endblock %}

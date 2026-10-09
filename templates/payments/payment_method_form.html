@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Add payment method · SmartPay{% endblock %}
+{% block content %}
+<div class="narrow-page">
+  <a class="back-link" href="{% url 'payment_method_list' %}">← Payment methods</a>
+  <header class="simple-header"><p class="page-kicker">Your wallet</p><h1>Add a payment method</h1><p>Add a method to use at checkout.</p></header>
+  <section class="flat-panel form-panel">
+    <p class="muted-note">For your security, SmartPay only stores a display name and the last four digits. Never enter a full card number, security code, or bank credentials.</p>
+    <form method="post" novalidate>
+      {% csrf_token %}
+      {% for field in form %}
+      {% if field.name == "is_default" %}
+      <div class="form-check mb-3">{{ field }}<label class="form-check-label" for="{{ field.id_for_label }}">{{ field.label }}</label></div>
+      {% else %}
+      <div class="form-field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% for error in field.errors %}<small class="text-danger">{{ error }}</small>{% endfor %}</div>
+      {% endif %}
+      {% endfor %}
+      {% for error in form.non_field_errors %}<div class="form-error">{{ error }}</div>{% endfor %}
+      <button class="btn btn-primary w-100" type="submit">Save payment method</button>
+    </form>
+  </section>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(() => {
+  const type = document.getElementById('id_method_type');
+  const cardFields = ['id_last_four', 'id_expiry_month', 'id_expiry_year']
+    .map(id => document.getElementById(id)?.closest('.form-field')).filter(Boolean);
+  const update = () => {
+    const card = ['Visa', 'Mastercard'].includes(type.value);
+    cardFields.forEach(field => { field.hidden = !card; });
+  };
+  type.addEventListener('change', update);
+  update();
+})();
+</script>
+{% endblock %}

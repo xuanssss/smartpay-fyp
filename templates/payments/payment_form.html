@@ -1,25 +1,53 @@
 {% extends "base.html" %}
-{% block title %}Make payment · SmartPay{% endblock %}
+{% block title %}Make a payment · SmartPay{% endblock %}
 {% block content %}
-<div class="page-heading">
-  <p class="eyebrow text-primary">Simulation</p>
-  <h1 class="h2 fw-bold">Make a payment</h1>
-  <p class="text-secondary">No money will move. This records a payment for the prototype.</p>
-</div>
-<div class="card content-card mx-auto form-card">
-  <div class="card-body p-4">
-    <form method="post" novalidate>
-      {% csrf_token %}
-      {% for field in form %}
-        <div class="mb-3">
-          <label for="{{ field.id_for_label }}" class="form-label fw-semibold">{{ field.label }}</label>
-          {% if field.name == "amount" %}<div class="input-group"><span class="input-group-text">S$</span>{{ field }}</div>{% else %}{{ field }}{% endif %}
-          {% for error in field.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
-        </div>
+<header class="payment-page-header">
+  <p class="page-kicker">Pay</p>
+  <h1>Make a payment</h1>
+  <p>Choose a service, then select what you want to pay for.</p>
+</header>
+
+<div class="payment-browser">
+  <aside class="payment-sidebar" aria-label="Payment services">
+    <p class="payment-sidebar-title">Services</p>
+    <nav class="payment-category-list">
+      {% for group in browse_groups %}
+      <a class="payment-category {% if selected_category == group.slug %}active{% endif %}" href="?category={{ group.slug }}">
+        <span>{{ group.label }}</span>
+      </a>
       {% endfor %}
-      <div class="soft-note mb-4">Smart categorisation will suggest a category and explain why after you save.</div>
-      <button class="btn btn-primary btn-lg w-100" type="submit">Save simulated payment</button>
-    </form>
-  </div>
+    </nav>
+
+    <a class="sidebar-merchant-action" href="{% url 'pay_another_merchant' %}">
+      <strong>Pay another merchant</strong>
+    </a>
+  </aside>
+
+  <section class="payment-catalogue" aria-labelledby="catalogue-heading">
+    <div class="payment-results-header">
+      <h2 id="catalogue-heading">{{ selected_category_label }}</h2>
+      <span>{{ items|length }} item{{ items|length|pluralize }}</span>
+    </div>
+
+    <div class="payment-item-list">
+    {% for item in items %}
+      <a class="payment-item-row" href="{% url 'catalogue_item_detail' item.slug %}">
+        <span class="payment-item-copy">
+          <strong>{{ item.name }}</strong>
+          <small>{{ item.merchant_name }}</small>
+        </span>
+        <span class="payment-item-end">
+          <strong class="payment-item-price">{% if item.allows_quantity %}S${{ item.unit_price|floatformat:2 }}{% else %}From S${{ item.unit_price|floatformat:2 }}{% endif %}</strong>
+          <span class="payment-item-action">Select</span>
+        </span>
+      </a>
+    {% empty %}
+      <div class="market-empty">
+        <h3>No items available</h3>
+        <p>Please choose another service.</p>
+      </div>
+    {% endfor %}
+    </div>
+  </section>
 </div>
 {% endblock %}

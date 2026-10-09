@@ -1,47 +1,135 @@
 {% extends "base.html" %}
-{% block title %}Spending dashboard · SmartPay{% endblock %}
+{% block title %}Monthly spending · SmartPay{% endblock %}
 {% block extra_head %}<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>{% endblock %}
 {% block content %}
-<div class="page-heading mb-4">
-  <p class="eyebrow text-primary mb-1">Your spending story</p>
-  <h1 class="h2 fw-bold">Spending dashboard</h1>
-  <p class="text-secondary mb-0">{{ month|date:"F Y" }}</p>
+{% include "analytics/_dashboard_nav.html" %}
+
+<header class="dashboard-page-header">
+  <div><p class="page-kicker">SmartPay / Dashboard</p><h1>Monthly spending</h1><p>{{ month|date:"F Y" }}</p></div>
+</header>
+
+<section class="budget-overview-card {% if budget_summary.status == 'exceeded' or budget_summary.status == 'at_risk' %}budget-attention{% endif %}">
+  {% if budget_summary.budget %}
+  <div class="budget-main">
+    <div class="budget-card-heading"><span>{{ month|date:"F Y" }} overview</span><a href="{% url 'monthly_budget' %}?month={{ month_value }}">Edit budget</a></div>
+    <div class="budget-amount">
+      <div class="budget-spent"><span>Spent</span><strong>S${{ budget_summary.total|floatformat:2 }}</strong></div>
+      <div class="budget-target"><span>Monthly budget</span><strong>S${{ budget_summary.budget.amount|floatformat:2 }}</strong></div>
+    </div>
+    <div class="budget-progress" role="progressbar" aria-label="Budget used" aria-valuenow="{{ budget_summary.used_percent }}" aria-valuemin="0" aria-valuemax="100"><span style="width: {{ budget_summary.progress_percent }}%"></span></div>
+    <div class="budget-progress-label"><span>{{ budget_summary.used_percent }}% used</span></div>
+  </div>
+  {% else %}
+  <div class="budget-empty">
+    <div><span>{{ month|date:"F Y" }} overview</span><h2>S${{ budget_summary.total|floatformat:2 }} spent</h2><p>Add a budget to track your remaining amount and spending pace.</p></div>
+    <a class="btn btn-primary" href="{% url 'monthly_budget' %}?month={{ month_value }}">Set budget</a>
+  </div>
+  {% endif %}
+  <div class="budget-comparison">
+    <span>Compared with {{ comparison.label }}</span>
+    {% if comparison.change == None %}<strong>—</strong><small>Not enough history</small>{% elif comparison.change > 0 %}<strong class="text-attention">+{{ comparison.change }}%</strong><small>vs {{ comparison.previous_month|date:"F" }}</small>{% elif comparison.change < 0 %}<strong class="text-positive">−{{ comparison.change_abs }}%</strong><small>vs {{ comparison.previous_month|date:"F" }}</small>{% else %}<strong>0%</strong><small>no change</small>{% endif %}
+  </div>
+</section>
+
+<section class="dashboard-card merged-moments-card">
+  <div class="dashboard-card-heading">
+    <div><p class="page-kicker">Key moments</p><h2>What stood out this month</h2><small>Select a moment for a short explanation.</small></div>
+  </div>
+  {% if review.milestones %}
+  <div class="review-moment-grid" role="tablist" aria-label="Key moments">
+    {% for milestone in review.milestones %}
+    <button type="button" class="review-moment-card" data-moment-index="{{ forloop.counter0 }}" role="tab" aria-controls="reviewMomentDetail" aria-expanded="false">
+      <span class="review-moment-date">{{ milestone.date }}</span>
+      <strong>{{ milestone.label }}</strong>
+      <small>{{ milestone.value }}</small>
+    </button>
+    {% endfor %}
+  </div>
+  <div class="review-milestone-detail" id="reviewMomentDetail" aria-live="polite" hidden>
+    <strong id="momentDetailTitle"></strong>
+    <p id="momentDetailCopy"></p>
+  </div>
+  {% else %}
+  <p class="empty-copy compact">No payments were recorded for this month.</p>
+  {% endif %}
+</section>
+
+<div class="dashboard-overview-grid merged-overview-grid">
+  <section class="dashboard-card daily-spending-card">
+    <div class="dashboard-card-heading"><div><p class="page-kicker">Spending pace</p><h2>Cumulative spending this month</h2></div><span>Daily average S${{ budget_summary.daily_average|floatformat:2 }}</span></div>
+    {% if budget_summary.count %}<div class="daily-chart-wrap"><canvas id="dailyChart" aria-label="Cumulative monthly spending line chart"></canvas></div>{% else %}<p class="empty-copy">No payments recorded for this month.</p>{% endif %}
+  </section>
+
+  <section class="dashboard-card insight-card">
+    <div class="dashboard-card-heading"><div><p class="page-kicker">Smart insights</p><h2>At a glance</h2></div></div>
+    <div class="smart-insight-list">
+      {% for insight in smart_insights %}<article class="insight-{{ insight.tone }}"><strong>{{ insight.title }}</strong><p>{{ insight.message }}</p></article>{% empty %}<p class="empty-copy compact">Add more payments{% if not budget_summary.budget %} or set a budget{% endif %} to generate insights.</p>{% endfor %}
+    </div>
+  </section>
 </div>
-<div class="row g-3 mb-4">
-  <div class="col-12 col-md-7"><div class="hero-panel h-100"><small class="opacity-75">Total this month</small><div class="display-5 fw-bold mt-2">S${{ monthly_total|floatformat:2 }}</div>{% if month_change == None %}<span class="small">No previous-month comparison yet</span>{% elif month_change >= 0 %}<span class="change-pill change-up">↑ {{ month_change }}% from last month</span>{% else %}<span class="change-pill change-down">↓ {{ month_change_abs }}% from last month</span>{% endif %}</div></div>
-  <div class="col-6 col-md"><div class="metric-card h-100"><small>Previous month</small><strong class="fs-4">S${{ previous_total|floatformat:2 }}</strong></div></div>
-  <div class="col-6 col-md"><div class="metric-card h-100"><small>Active alerts</small><strong class="fs-4">{{ alert_summary.active }}</strong></div></div>
-</div>
 
-<div class="row g-4 mb-4">
-  <div class="col-lg-6"><div class="card content-card h-100"><div class="card-body p-4"><h2 class="h5 fw-bold">Spending by category</h2><p class="text-secondary small">Where your money went this month</p>{% if category_breakdown %}<div class="chart-wrap"><canvas id="categoryChart"></canvas></div>{% else %}<p class="empty-copy">Add payments to see your category chart.</p>{% endif %}</div></div></div>
-  <div class="col-lg-6"><div class="card content-card h-100"><div class="card-body p-4"><h2 class="h5 fw-bold">Monthly comparison</h2><p class="text-secondary small">This month compared with last month</p><div class="chart-wrap"><canvas id="monthChart"></canvas></div></div></div>
-</div>
+<section class="dashboard-card merged-trend-card mt-4">
+  <div class="dashboard-card-heading">
+    <div><p class="page-kicker">Longer-term context</p><h2>How {{ month|date:"F" }} compares</h2><small>Hover or tap a month to see its total, payment count, and average payment.</small></div>
+    <div class="review-range-control" role="group" aria-label="Chart range">
+      <button type="button" data-range="6">6 months</button>
+      <button type="button" class="active" data-range="12">12 months</button>
+    </div>
+  </div>
+  <div class="review-chart-wrap"><canvas id="reviewChart" aria-label="Monthly spending trend"></canvas></div>
+</section>
 
-<div class="row g-4 mb-4">
-  <div class="col-lg-6"><div class="card content-card h-100"><div class="card-body p-4"><h2 class="h5 fw-bold mb-3">Top merchants</h2>{% for merchant in top_merchants %}<div class="rank-row"><span class="rank">{{ forloop.counter }}</span><div class="flex-grow-1"><strong>{{ merchant.merchant_name }}</strong><div class="small text-secondary">{{ merchant.count }} payment{{ merchant.count|pluralize }}</div></div><strong>S${{ merchant.total|floatformat:2 }}</strong></div>{% empty %}<p class="text-secondary">No spending this month.</p>{% endfor %}</div></div></div>
-  <div class="col-lg-6"><div class="card content-card h-100"><div class="card-body p-4"><h2 class="h5 fw-bold mb-3">Largest transactions</h2>{% for item in largest_transactions %}<a class="rank-row text-reset text-decoration-none" href="{% url 'transaction_detail' item.pk %}"><span class="merchant-avatar merchant-avatar-sm">{{ item.merchant_name|first|upper }}</span><div class="flex-grow-1 min-w-0"><strong class="d-block text-truncate">{{ item.merchant_name }}</strong><div class="small text-secondary">{{ item.final_category.name }}</div></div><strong>S${{ item.amount|floatformat:2 }}</strong></a>{% empty %}<p class="text-secondary">No spending this month.</p>{% endfor %}</div></div></div>
-</div>
-
-<div class="card content-card mb-4"><div class="card-body p-4">
-  <div class="d-flex justify-content-between align-items-center mb-3"><div><h2 class="h5 fw-bold mb-1">Recurring bills detected</h2><p class="text-secondary small mb-0">Similar payments across at least three different months</p></div><span class="badge text-bg-primary rounded-pill">{{ recurring_bills|length }}</span></div>
-  <div class="row g-3">{% for bill in recurring_bills %}<div class="col-md-6 col-xl-4"><div class="recurring-card"><div class="d-flex justify-content-between gap-2"><strong>{{ bill.merchant_name }}</strong><strong>S${{ bill.average_amount|floatformat:2 }}</strong></div><div class="text-secondary small mt-2">{{ bill.category.name }} · {{ bill.frequency_label }} · {{ bill.transaction_count }} payments</div></div></div>{% empty %}<div class="col"><p class="text-secondary mb-0">No recurring pattern has enough history yet.</p></div>{% endfor %}</div>
-</div></div>
-
-<div class="card content-card"><div class="card-body p-4"><h2 class="h5 fw-bold">High category spending insights</h2>{% for alert in high_spending_alerts %}<div class="alert-item border-start border-4 border-warning"><strong>{{ alert.title }}</strong><p class="small text-secondary mb-0 mt-1">{{ alert.message }}</p></div>{% empty %}<p class="text-secondary mb-0">No category increases currently need your attention.</p>{% endfor %}</div></div>
-
-{{ category_labels_json|json_script:"category-labels" }}
-{{ category_values_json|json_script:"category-values" }}
-{{ month_labels_json|json_script:"month-labels" }}
-{{ month_values_json|json_script:"month-values" }}
+{{ review.milestones|json_script:"review-milestones" }}
+{{ review_interactions|json_script:"review-interactions" }}
+{{ review_trend|json_script:"review-trend" }}
 {% endblock %}
 {% block scripts %}
 <script>
-  const readData = id => JSON.parse(document.getElementById(id).textContent);
-  const palette = ['#5267e8','#8b5cf6','#18a999','#f59e0b','#ef6461','#38bdf8','#ec4899','#84cc16','#f97316','#94a3b8'];
-  const categoryCanvas = document.getElementById('categoryChart');
-  if (categoryCanvas) new Chart(categoryCanvas, {type:'doughnut', data:{labels:readData('category-labels'),datasets:[{data:readData('category-values'),backgroundColor:palette,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'64%',plugins:{legend:{position:'bottom',labels:{usePointStyle:true,padding:16}}}}});
-  const monthCanvas = document.getElementById('monthChart');
-  if (monthCanvas) new Chart(monthCanvas, {type:'bar',data:{labels:readData('month-labels'),datasets:[{label:'Spending (S$)',data:readData('month-values'),backgroundColor:['#c7d2fe','#5267e8'],borderRadius:10}]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{beginAtZero:true,grid:{color:'#eef1f6'}},x:{grid:{display:false}}},plugins:{legend:{display:false}}}});
+  const interactions = JSON.parse(document.getElementById('review-interactions').textContent);
+  const milestones = JSON.parse(document.getElementById('review-milestones').textContent);
+  const trend = JSON.parse(document.getElementById('review-trend').textContent);
+  const money = value => 'S$' + Number(value).toLocaleString('en-SG', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+  const selectMoment = index => {
+    const milestone = milestones[index];
+    document.getElementById('reviewMomentDetail').hidden = false;
+    document.getElementById('momentDetailTitle').textContent = milestone.story_title;
+    document.getElementById('momentDetailCopy').textContent = milestone.narrative;
+    document.querySelectorAll('[data-moment-index]').forEach((button, buttonIndex) => {
+      const active = buttonIndex === index;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-selected', String(active));
+      button.setAttribute('aria-expanded', String(active));
+    });
+  };
+  document.querySelectorAll('[data-moment-index]').forEach((button, index) => button.addEventListener('click', () => selectMoment(index)));
+
+  const dailyCanvas = document.getElementById('dailyChart');
+  if (dailyCanvas) {
+    new Chart(dailyCanvas, {
+      type:'line',
+      data:{labels:interactions.cumulative_labels,datasets:[{data:interactions.cumulative_values,borderColor:'#000080',backgroundColor:'rgba(0,0,128,.08)',borderWidth:2.5,pointRadius:2,pointHoverRadius:5,pointBackgroundColor:'#fff',pointBorderColor:'#000080',pointBorderWidth:1.5,tension:.22,fill:true}]},
+      options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},scales:{y:{beginAtZero:true,border:{display:false},grid:{color:'rgba(0,0,128,.08)'},ticks:{callback:value=>'S$'+value}},x:{border:{display:false},grid:{display:false},ticks:{maxTicksLimit:7,callback:(value,index)=>index+1}}},plugins:{legend:{display:false},tooltip:{displayColors:false,callbacks:{title:items=>'Day '+items[0].label,label:context=>money(context.raw)}}}}
+    });
+  }
+
+  const reviewCanvas = document.getElementById('reviewChart');
+  let activeRange = 12;
+  const reviewChart = new Chart(reviewCanvas, {
+    type:'bar',
+    data:{labels:[],datasets:[{data:[],backgroundColor:[],hoverBackgroundColor:[],borderRadius:7,borderSkipped:false,barPercentage:.72,categoryPercentage:.82}]},
+    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},scales:{y:{beginAtZero:true,border:{display:false},grid:{color:'rgba(0,0,128,.08)'},ticks:{callback:value=>'S$'+value}},x:{border:{display:false},grid:{display:false}}},plugins:{legend:{display:false},tooltip:{displayColors:false,callbacks:{label:context=>money(context.raw),afterLabel:context=>{const sourceIndex=trend.labels.length-activeRange+context.dataIndex;const count=trend.counts[sourceIndex];return [count+' payment'+(count===1?'':'s'),money(trend.averages[sourceIndex])+' average'];}}}}}
+  });
+  const setRange = range => {
+    activeRange = range;
+    reviewChart.data.labels = trend.labels.slice(-range);
+    reviewChart.data.datasets[0].data = trend.values.slice(-range);
+    reviewChart.data.datasets[0].backgroundColor = reviewChart.data.labels.map((_, index) => index === reviewChart.data.labels.length - 1 ? '#e85d3f' : '#3447a8');
+    reviewChart.data.datasets[0].hoverBackgroundColor = reviewChart.data.labels.map((_, index) => index === reviewChart.data.labels.length - 1 ? '#d84f32' : '#000080');
+    reviewChart.update();
+    document.querySelectorAll('[data-range]').forEach(button => button.classList.toggle('active', Number(button.dataset.range) === range));
+  };
+  document.querySelectorAll('[data-range]').forEach(button => button.addEventListener('click', () => setRange(Number(button.dataset.range))));
+  setRange(12);
 </script>
 {% endblock %}

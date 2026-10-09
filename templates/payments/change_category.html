@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 {% block title %}Change category · SmartPay{% endblock %}
 {% block content %}
-<a class="back-link" href="{% url 'transaction_detail' transaction.pk %}">‹ Back to payment</a>
-<div class="card content-card mx-auto form-card mt-3"><div class="card-body p-4 p-md-5">
-  <p class="eyebrow text-primary">Improve the result</p>
-  <h1 class="h3 fw-bold">Change category</h1>
-  <p class="text-secondary">{{ transaction.merchant_name }} · S${{ transaction.amount|floatformat:2 }}</p>
-  <div class="soft-note mb-4">The original prediction, <strong>{{ transaction.predicted_category.name }}</strong>, will be kept for project evaluation.</div>
-  <form method="post">{% csrf_token %}{{ form.as_p }}<button class="btn btn-primary btn-lg w-100" type="submit">Save correction</button></form>
-</div></div>
+<div class="narrow-page">
+  <a class="back-link" href="{% url 'transaction_detail' transaction.pk %}">← Payment details</a>
+  <header class="simple-header"><p class="page-kicker">Correction</p><h1>Change category</h1><p>{{ transaction.merchant_name }} · S${{ transaction.amount|floatformat:2 }}</p></header>
+  <section class="flat-panel form-panel">
+    <p class="muted-note">The original prediction, <strong>{{ transaction.predicted_category.name }}</strong>, will remain available for project evaluation.</p>
+    <form method="post">{% csrf_token %}{{ form.as_p }}<button class="btn btn-primary w-100" type="submit">Save category</button></form>
+  </section>
+</div>
 {% endblock %}

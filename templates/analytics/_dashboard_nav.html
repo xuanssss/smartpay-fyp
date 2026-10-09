@@ -1,0 +1,9 @@
+<div class="dashboard-page-controls">
+  <form class="dashboard-month-control" method="get">
+    <a class="dashboard-month-arrow" href="{{ dashboard_view_url }}?month={{ previous_month_value }}" aria-label="Previous month">‹</a>
+    <label for="dashboard-month">Month</label>
+    <input id="dashboard-month" type="month" name="month" value="{{ month_value }}">
+    <button type="submit">View</button>
+    <a class="dashboard-month-arrow" href="{{ dashboard_view_url }}?month={{ next_month_value }}" aria-label="Next month">›</a>
+  </form>
+</div>

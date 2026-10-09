@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Monthly budget · SmartPay{% endblock %}
+{% block content %}
+<div class="narrow-page">
+  <a class="back-link" href="{% url 'dashboard' %}?month={{ month|date:'Y-m' }}">← Dashboard overview</a>
+  <header class="simple-header"><p class="page-kicker">Budget settings</p><h1>{% if effective_budget %}Change{% else %}Set{% endif %} monthly budget</h1><p>This amount applies from the selected month onward. Earlier months keep the budget that applied at the time.</p></header>
+  <section class="flat-panel form-panel">
+    {% if effective_budget and not budget %}<p class="budget-inheritance-note">The current S${{ effective_budget.amount|floatformat:2 }} budget was set in {{ effective_budget.month|date:"F Y" }}. Saving here creates a new budget from {{ month|date:"F Y" }} onward.</p>{% endif %}
+    <form method="post" novalidate>{% csrf_token %}
+      {% for field in form.visible_fields %}<div class="form-field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{% if field.name == 'amount' %}<div class="input-group"><span class="input-group-text">S$</span>{{ field }}</div>{% else %}{{ field }}{% endif %}{% for error in field.errors %}<small class="text-danger">{{ error }}</small>{% endfor %}</div>{% endfor %}
+      <button class="btn btn-primary w-100" type="submit" name="action" value="save">Save budget</button>
+    </form>
+    {% if budget %}<form class="budget-delete-form" method="post">{% csrf_token %}<input type="hidden" name="month" value="{{ month|date:'Y-m' }}"><button class="btn btn-link text-danger w-100" type="submit" name="action" value="delete">Remove this change and use the previous budget</button></form>{% endif %}
+  </section>
+</div>
+{% endblock %}

@@ -1,24 +1,26 @@
 {% extends "base.html" %}
 {% block title %}Home · SmartPay{% endblock %}
 {% block content %}
-<section class="hero-panel mb-4">
-  <p class="eyebrow mb-2">Good to see you, {{ user.first_name|default:user.username }}</p>
-  <h1 class="display-6 fw-bold mb-1">S${{ monthly_total|floatformat:2 }}</h1>
-  <p class="mb-0 opacity-75">Spent this month</p>
+<header class="page-header">
+  <div><p class="page-kicker">Overview</p><h1>Hello, {{ user.first_name|default:user.username }}</h1><p>Here is a simple view of your spending.</p></div>
+</header>
+
+<section class="balance-panel mb-4">
+  <div><span>Spent this month</span><strong>S${{ monthly_total|floatformat:2 }}</strong></div>
 </section>
 
-<div class="row g-3 mb-4">
-  <div class="col-6 col-lg-3"><div class="metric-card h-100"><span class="metric-icon bg-soft-purple">◎</span><small>Top category</small><strong>{{ top_category.final_category__name|default:"No spending yet" }}</strong></div></div>
-  <div class="col-6 col-lg-3"><div class="metric-card h-100"><span class="metric-icon bg-soft-red">!</span><small>Needs attention</small><strong>{{ alert_summary.active }} alert{{ alert_summary.active|pluralize }}</strong></div></div>
-  <div class="col-6 col-lg-3"><div class="metric-card h-100"><span class="metric-icon bg-soft-blue">↻</span><small>Recurring bills</small><strong>{{ recurring_count }} detected</strong></div></div>
-  <div class="col-6 col-lg-3"><div class="metric-card h-100"><span class="metric-icon bg-soft-green">✓</span><small>Environment</small><strong>Simulation</strong></div></div>
-</div>
+<section class="summary-grid mb-4" aria-label="Monthly summary">
+  <a class="summary-item" href="{% url 'dashboard' %}"><span class="summary-label">Top category</span><strong>{{ top_category.final_category__name|default:"No spending yet" }}</strong><small>Highest spend this month</small></a>
+  <a class="summary-item" href="{% url 'alert_list' %}"><span class="summary-label">Needs attention</span><strong>{{ alert_summary.active }} alert{{ alert_summary.active|pluralize }}</strong><small>Items worth reviewing</small></a>
+</section>
 
-<h2 class="h5 fw-bold mb-3">What would you like to do?</h2>
-<div class="row g-3 action-grid">
-  <div class="col-12 col-sm-6"><a class="action-card primary-action" href="{% url 'create_payment' %}"><span class="action-symbol">＋</span><span><strong>Make Payment</strong><small>Create a simulated payment</small></span><span>›</span></a></div>
-  <div class="col-12 col-sm-6"><a class="action-card" href="{% url 'transaction_history' %}"><span class="action-symbol">≡</span><span><strong>View Transactions</strong><small>Review your payment history</small></span><span>›</span></a></div>
-  <div class="col-12 col-sm-6"><a class="action-card" href="{% url 'dashboard' %}"><span class="action-symbol">◔</span><span><strong>View Dashboard</strong><small>Understand your spending</small></span><span>›</span></a></div>
-  <div class="col-12 col-sm-6"><a class="action-card" href="{% url 'alert_list' %}"><span class="action-symbol">!</span><span><strong>View Alerts</strong><small>See items worth reviewing</small></span><span>›</span></a></div>
-</div>
+<section class="flat-panel">
+  <div class="section-heading"><div><p class="page-kicker">Shortcuts</p><h2>Quick actions</h2></div></div>
+  <div class="action-list">
+    <a href="{% url 'create_payment' %}"><span class="line-icon">＋</span><span><strong>Make a payment</strong><small>Browse services or enter a merchant</small></span><b>→</b></a>
+    <a href="{% url 'transaction_history' %}"><span class="line-icon">≡</span><span><strong>Transactions</strong><small>Review payment history and reasons</small></span><b>→</b></a>
+    <a href="{% url 'dashboard' %}"><span class="line-icon">⌁</span><span><strong>Spending dashboard</strong><small>See categories, merchants and spending trends</small></span><b>→</b></a>
+    <a href="{% url 'alert_list' %}"><span class="line-icon">!</span><span><strong>Needs attention</strong><small>Review unusual or repeated payments</small></span><b>→</b></a>
+  </div>
+</section>
 {% endblock %}

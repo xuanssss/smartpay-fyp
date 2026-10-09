@@ -1,145 +1,315 @@
 import random
-from datetime import datetime, timedelta
+from datetime import timedelta
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 from django.db import transaction as db_transaction
 from django.utils import timezone
+from django.utils.text import slugify
 
 from alerts.services.alert_generation import generate_alerts
-from analytics.services.recurring import refresh_recurring_bills
-from payments.models import Category, MerchantRule, Transaction
+from analytics.models import MonthlyBudget
+from payments.models import (
+    BrowseCategory,
+    CatalogueItem,
+    Category,
+    PaymentMethod,
+    Transaction,
+)
+from payments.services.catalog import payment_type_for_item
 from payments.services.categorisation import categorise_transaction
+from payments.services.payment_processing import bank_transaction_type_for_payment
+from payments.taxonomy import PURCHASE_CATEGORY_DESCRIPTIONS
 
 
-# TODO-FYP-TWEAK: Edit the category list and descriptions for the final taxonomy.
-CATEGORIES = {
-    "Food & Dining": "Meals, drinks, food courts, and delivery.",
-    "Transport": "Public transport, taxis, and ride services.",
-    "Shopping": "Retail, online purchases, and groceries.",
-    "Utilities": "Electricity, water, broadband, and phone bills.",
-    "Subscriptions": "Recurring digital and membership services.",
-    "Education": "Courses, school fees, and learning materials.",
-    "Healthcare": "Pharmacy, clinic, and healthcare spending.",
-    "Housing / Rent": "Rent, housing fees, and property costs.",
-    "Entertainment": "Movies, events, attractions, and leisure.",
-    "Others": "Payments without a strong category match.",
-}
+# Financial categories use the reviewed purchase-only application taxonomy.
+CATEGORIES = PURCHASE_CATEGORY_DESCRIPTIONS
 
 
-# TODO-FYP-TWEAK: Extend merchant rules and explanations using study findings.
-MERCHANT_RULES = [
-    ("grab ride", "Transport", 0.88, "Merchant wording indicates a Grab ride or transport payment."),
-    ("grab taxi", "Transport", 0.88, "Merchant wording indicates a Grab ride or transport payment."),
-    ("grab transport", "Transport", 0.88, "Merchant wording indicates a Grab ride or transport payment."),
-    ("grab food", "Food & Dining", 0.88, "Merchant wording indicates a Grab food or delivery payment."),
-    ("grab eat", "Food & Dining", 0.88, "Merchant wording indicates a Grab food or delivery payment."),
-    ("grab delivery", "Food & Dining", 0.88, "Merchant wording indicates a Grab food or delivery payment."),
-    ("Foodpanda", "Food & Dining", 0.95, "Merchant name matches a known food delivery provider."),
-    ("Deliveroo", "Food & Dining", 0.95, "Merchant name matches a known food delivery provider."),
-    ("McDonald's", "Food & Dining", 0.95, "Merchant name matches a known food and dining provider."),
-    ("Koufu", "Food & Dining", 0.95, "Merchant name matches a known food and dining provider."),
-    ("Starbucks", "Food & Dining", 0.95, "Merchant name matches a known food and dining provider."),
-    ("ComfortDelGro", "Transport", 0.95, "Merchant name matches a known transport provider."),
-    ("Gojek", "Transport", 0.95, "Merchant name matches a known transport provider."),
-    ("MRT", "Transport", 0.95, "Merchant name matches a known public transport provider."),
-    ("SimplyGo", "Transport", 0.95, "Merchant name matches a known public transport provider."),
-    ("Shopee", "Shopping", 0.95, "Merchant name matches a known shopping provider."),
-    ("Lazada", "Shopping", 0.95, "Merchant name matches a known shopping provider."),
-    ("Amazon", "Shopping", 0.95, "Merchant name matches a known shopping provider."),
-    ("FairPrice", "Shopping", 0.95, "Merchant name matches a known retail or grocery provider."),
-    ("SP Group", "Utilities", 0.95, "Merchant name matches a known utility provider."),
-    ("Geneco", "Utilities", 0.95, "Merchant name matches a known utility provider."),
-    ("Singtel", "Utilities", 0.95, "Merchant name matches a known utility or telco provider."),
-    ("StarHub", "Utilities", 0.95, "Merchant name matches a known utility or telco provider."),
-    ("M1", "Utilities", 0.95, "Merchant name matches a known utility or telco provider."),
-    ("Netflix", "Subscriptions", 0.95, "Merchant name matches a known subscription provider."),
-    ("Spotify", "Subscriptions", 0.95, "Merchant name matches a known subscription provider."),
-    ("Disney+", "Subscriptions", 0.95, "Merchant name matches a known subscription provider."),
-    ("YouTube Premium", "Subscriptions", 0.95, "Merchant name matches a known subscription provider."),
-    ("SMU", "Education", 0.95, "Merchant name matches a known education provider."),
-    ("Coursera", "Education", 0.95, "Merchant name matches a known education provider."),
-    ("Udemy", "Education", 0.95, "Merchant name matches a known education provider."),
-    ("Guardian", "Healthcare", 0.95, "Merchant name matches a known healthcare retailer."),
-    ("Watsons", "Healthcare", 0.95, "Merchant name matches a known healthcare retailer."),
-    ("Rent", "Housing / Rent", 0.95, "Merchant wording indicates a housing or rent payment."),
-    ("Landlord", "Housing / Rent", 0.95, "Merchant wording indicates a housing or rent payment."),
-    ("Cathay", "Entertainment", 0.95, "Merchant name matches a known entertainment provider."),
-    ("Golden Village", "Entertainment", 0.95, "Merchant name matches a known entertainment provider."),
+# A browse category is navigation only and is intentionally separate from the
+# financial Category prediction.
+# TODO-FYP-TWEAK: Rename, reorder, or replace catalogue browse categories.
+BROWSE_CATEGORIES = [
+    ("Food", "food-drinks", "Meals and drinks", "🍜"),
+    ("Transport", "transport", "Trips and transport value", "🚆"),
+    ("Groceries", "groceries", "Everyday grocery items", "🛒"),
+    ("Bills", "bills", "Household and communication bills", "💡"),
+    ("Subscriptions", "subscriptions", "Digital memberships", "▣"),
+    ("Education", "education", "Courses and learning costs", "▤"),
+    ("Healthcare", "healthcare", "Health products and services", "✚"),
+    ("Housing", "home", "Housing and household services", "⌂"),
+    ("Entertainment", "entertainment", "Movies, events, and games", "☆"),
+    ("Shopping", "shopping", "Retail and personal items", "◫"),
+    ("Other", "other", "Miscellaneous payments and services", ""),
 ]
 
 
+# name, merchant, raw transaction description, price, financial ground truth,
+# allows quantity, icon. There are five items in every browse category.
+# TODO-FYP-TWEAK: Replace catalogue items and prices with the final demo set.
+CATALOGUE_ITEMS = {
+    "food-drinks": [
+        ("Chicken Rice", "Koufu", "CHICKEN RICE MEAL", "5.80", "Dining", True, "🍚"),
+        ("Nasi Lemak", "Koufu", "NASI LEMAK MEAL", "6.20", "Dining", True, "🍛"),
+        ("Kaya Toast Set", "Koufu", "KAYA TOAST BREAKFAST", "4.90", "Dining", True, "🍞"),
+        ("Bubble Tea", "Foodpanda", "BUBBLE TEA DELIVERY", "4.50", "Dining", True, "🧋"),
+        ("Iced Latte", "Starbucks", "ICED LATTE DRINK", "7.30", "Dining", True, "☕"),
+    ],
+    "transport": [
+        ("MRT Trip", "SimplyGo", "MRT TRIP", "2.20", "Public Transport", True, "🚆"),
+        ("Bus Trip", "SimplyGo", "BUS TRIP", "1.80", "Public Transport", True, "🚌"),
+        ("Taxi Ride", "ComfortDelGro", "TAXI RIDE", "18.00", "Private Hire & Taxis", False, "🚕"),
+        ("Private-hire Ride", "Gojek", "PRIVATE-HIRE RIDE", "16.00", "Private Hire & Taxis", False, "🚗"),
+        ("Transport Top-up", "SimplyGo", "TRANSPORT TOP-UP", "20.00", "Public Transport", False, "＋"),
+    ],
+    "groceries": [
+        ("Fresh Eggs", "FairPrice", "FRESH EGGS GROCERIES", "3.80", "Groceries", True, "🥚"),
+        ("Fresh Milk", "FairPrice", "FRESH MILK GROCERIES", "3.20", "Groceries", True, "🥛"),
+        ("Wholemeal Bread", "FairPrice", "WHOLEMEAL BREAD GROCERIES", "2.90", "Groceries", True, "🍞"),
+        ("Cooking Oil", "FairPrice", "COOKING OIL GROCERIES", "7.90", "Groceries", True, "◉"),
+        ("Laundry Detergent", "FairPrice", "LAUNDRY DETERGENT HOUSEHOLD", "12.80", "Groceries", True, "◇"),
+    ],
+    "bills": [
+        ("Electricity Bill", "SP Group", "MONTHLY ELECTRICITY BILL", "98.00", "Bills", False, "⚡"),
+        ("Water Bill", "SP Group", "MONTHLY WATER BILL", "36.00", "Bills", False, "💧"),
+        ("Mobile Phone Bill", "Singtel", "MONTHLY MOBILE PHONE BILL", "48.00", "Bills", False, "▯"),
+        ("Internet Bill", "StarHub", "MONTHLY INTERNET BILL", "52.00", "Bills", False, "◎"),
+        ("Green Energy Bill", "Geneco", "MONTHLY ELECTRICITY BILL", "92.00", "Bills", False, "♻"),
+    ],
+    "subscriptions": [
+        ("Streaming Subscription", "Netflix", "MONTHLY STREAMING SUBSCRIPTION", "15.98", "Entertainment", False, "▶"),
+        ("Music Subscription", "Spotify", "MONTHLY MUSIC SUBSCRIPTION", "10.98", "Entertainment", False, "♫"),
+        ("Family Streaming", "Disney+", "MONTHLY STREAMING SUBSCRIPTION", "14.98", "Entertainment", False, "★"),
+        ("Video Premium", "YouTube Premium", "MONTHLY VIDEO SUBSCRIPTION", "13.98", "Entertainment", False, "▷"),
+        ("Cloud Storage", "CloudBox", "MONTHLY CLOUD STORAGE SUBSCRIPTION", "4.48", "Services", False, "☁"),
+    ],
+    "education": [
+        ("Online Course", "Coursera", "ONLINE COURSE", "59.00", "Services", True, "▤"),
+        ("Skills Course", "Udemy", "ONLINE COURSE", "24.90", "Services", True, "◆"),
+        ("University Textbook", "Amazon", "UNIVERSITY TEXTBOOK", "68.00", "Online Shopping", True, "▥"),
+        ("Tuition Fee", "SMU", "SEMESTER TUITION FEE", "500.00", "Services", False, "▦"),
+        ("Examination Fee", "SMU", "EXAMINATION FEE", "120.00", "Services", False, "✓"),
+    ],
+    "healthcare": [
+        ("Daily Vitamins", "Guardian", "DAILY VITAMINS", "18.90", "Healthcare", True, "✚"),
+        ("Cold Medication", "Watsons", "COLD MEDICATION", "12.50", "Healthcare", True, "✣"),
+        ("Medical Consultation", "Neighbourhood Clinic", "MEDICAL CONSULTATION", "45.00", "Healthcare", False, "⚕"),
+        ("Dental Appointment", "Bright Dental", "DENTAL APPOINTMENT", "85.00", "Healthcare", False, "◌"),
+        ("Health Screening", "Wellness Centre", "HEALTH SCREENING", "120.00", "Healthcare", False, "♡"),
+    ],
+    "home": [
+        ("Home Cleaning Plan", "CleanHome", "MONTHLY HOME CLEANING SERVICE", "32.00", "Home Improvement", False, "⌂"),
+        ("Aircon Servicing", "CoolCare", "AIRCON SERVICING", "72.00", "Home Improvement", False, "⌁"),
+        ("Plumbing Repair", "HomeFix Services", "HOME REPAIR PLUMBING", "90.00", "Home Improvement", False, "⚒"),
+        ("Lighting Repair", "HomeFix Services", "HOME REPAIR LIGHTING", "65.00", "Home Improvement", False, "✦"),
+        ("Household Organiser", "IKEA Singapore", "HOUSEHOLD ITEM ORGANISER", "32.00", "Home Improvement", True, "◇"),
+    ],
+    "entertainment": [
+        ("Cinema Ticket", "Golden Village", "CINEMA TICKET", "15.00", "Entertainment", True, "🎬"),
+        ("Movie Snack Set", "Cathay", "CINEMA SNACK SET", "10.50", "Entertainment", True, "🍿"),
+        ("Concert Ticket", "City Events", "CONCERT TICKET", "88.00", "Entertainment", True, "♫"),
+        ("Game Purchase", "Game Store", "DIGITAL GAME PURCHASE", "35.00", "Entertainment", True, "◈"),
+        ("Attraction Ticket", "Sentosa Fun", "ATTRACTION TICKET", "42.00", "Entertainment", True, "☆"),
+    ],
+    "shopping": [
+        ("Basic T-shirt", "Shopee", "COTTON T-SHIRT", "18.90", "Clothing", True, "▱"),
+        ("Running Shoes", "Lazada", "RUNNING SHOES", "69.00", "Clothing", True, "♢"),
+        ("Mobile Phone", "Amazon", "MOBILE PHONE", "699.00", "Online Shopping", True, "▯"),
+        ("Wireless Headphones", "Shopee", "WIRELESS HEADPHONES", "49.90", "Online Shopping", True, "◉"),
+        ("Household Organiser", "Lazada", "HOUSEHOLD ITEM ORGANISER", "16.50", "Home Improvement", True, "▦"),
+    ],
+    "other": [
+        ("Parcel Postage", "SingPost", "PARCEL POSTAGE SERVICE", "4.80", "Services", True, ""),
+        ("Printing Service", "Print Hub", "DOCUMENT PRINTING SERVICE", "2.50", "Services", True, ""),
+        ("Laundry Service", "WashLab", "LAUNDRY SERVICE", "12.00", "Services", True, ""),
+        ("Gift Card", "City Gifts", "GENERAL PURPOSE GIFT CARD", "25.00", "Other", False, ""),
+        ("Donation", "Community Fund", "CHARITABLE DONATION", "10.00", "Other", False, ""),
+    ],
+}
+
+
 class Command(BaseCommand):
-    help = "Create categories, rules, the demo account, and presentation-ready sample transactions."
+    help = "Create the persistent catalogue, demo methods, and four months of demonstration transactions."
+
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--if-missing",
+            action="store_true",
+            help="Seed only when the demo user does not exist (safe for repeated deployments).",
+        )
 
     @db_transaction.atomic
     def handle(self, *args, **options):
+        User = get_user_model()
+        if options["if_missing"] and User.objects.filter(username="demo").exists():
+            self.stdout.write("Demo data already exists; seed skipped.")
+            return
+
         random.seed(42)
+        Category.objects.update(is_active=False)
         categories = {
-            name: Category.objects.update_or_create(name=name, defaults={"description": description})[0]
+            name: Category.objects.update_or_create(
+                name=name,
+                defaults={"description": description, "is_active": True},
+            )[0]
             for name, description in CATEGORIES.items()
         }
-        for keyword, category_name, confidence, explanation in MERCHANT_RULES:
-            MerchantRule.objects.update_or_create(
-                keyword=keyword,
+        browse_categories = {}
+        BrowseCategory.objects.update(is_active=False)
+        for order, (name, slug, description, _icon) in enumerate(BROWSE_CATEGORIES):
+            browse_categories[slug] = BrowseCategory.objects.update_or_create(
+                slug=slug,
                 defaults={
-                    "category": categories[category_name],
-                    "confidence_score": confidence,
-                    "explanation_template": explanation,
+                    "name": name,
+                    "description": description,
+                    "icon_name": "",
+                    "display_order": order,
+                    "is_active": True,
                 },
-            )
+            )[0]
 
-        User = get_user_model()
+        CatalogueItem.objects.update(is_active=False)
+        catalogue = {}
+        for browse_slug, item_rows in CATALOGUE_ITEMS.items():
+            for order, (name, merchant, description, price, ground_truth, allows_quantity, _icon) in enumerate(item_rows):
+                item_slug = f"{browse_slug}-{slugify(name)}"
+                catalogue[item_slug] = CatalogueItem.objects.update_or_create(
+                    slug=item_slug,
+                    defaults={
+                        "name": name,
+                        "browse_category": browse_categories[browse_slug],
+                        "merchant_name": merchant,
+                        "transaction_description": description,
+                        "short_description": description.title(),
+                        "unit_price": Decimal(price),
+                        "icon_name": "",
+                        "allows_quantity": allows_quantity,
+                        "minimum_quantity": 1,
+                        "maximum_quantity": 8,
+                        "is_active": True,
+                        "display_order": order,
+                        "ground_truth_category": categories[ground_truth],
+                    },
+                )[0]
+
         user, _ = User.objects.get_or_create(username="demo", defaults={"email": "demo@example.com"})
         user.email = "demo@example.com"
         user.set_password("demo12345")
         user.save()
         user.transactions.all().delete()
+        user.payment_methods.all().delete()
+        user.monthly_budgets.all().delete()
+
+        visa = PaymentMethod.objects.create(
+            user=user,
+            method_type=PaymentMethod.MethodType.VISA,
+            display_name="Visa",
+            last_four="4821",
+            expiry_month=12,
+            expiry_year=timezone.localdate().year + 3,
+            is_default=True,
+        )
+        PaymentMethod.objects.create(
+            user=user, method_type=PaymentMethod.MethodType.APPLE_PAY,
+            display_name="Apple Pay",
+        )
+        PaymentMethod.objects.create(
+            user=user, method_type=PaymentMethod.MethodType.PAYNOW,
+            display_name="PayNow",
+        )
 
         now = timezone.localtime().replace(second=0, microsecond=0)
-        month_starts = [self._shift_month(now, offset) for offset in (-2, -1, 0)]
-        recurring = [
-            ("Netflix", "Subscription", [15.98, 15.98, 15.98]),
-            ("SP Group", "Bill", [96.20, 101.40, 99.80]),
-            ("Singtel", "Bill", [48.00, 48.00, 48.00]),
-            ("Landlord", "Housing", [850.00, 850.00, 850.00]),
+        month_starts = [self._shift_month(now, offset) for offset in (-3, -2, -1, 0)]
+        monthly_service_slugs = [
+            "subscriptions-streaming-subscription",
+            "bills-electricity-bill",
+            "bills-mobile-phone-bill",
+            "home-home-cleaning-plan",
         ]
-        variable = [
-            ("Foodpanda", "Food", 18, 45), ("Koufu", "Food", 5, 14),
-            ("Starbucks", "Food", 6, 16), ("ComfortDelGro", "Transport", 12, 38),
-            ("SimplyGo", "Transport", 3, 12), ("Shopee", "Shopping", 18, 95),
-            ("FairPrice", "Shopping", 25, 85), ("Guardian", "Healthcare", 10, 55),
-            ("Spotify", "Subscription", 10, 13), ("Coursera", "Education", 25, 80),
-            ("Watsons", "Healthcare", 8, 45), ("Golden Village", "Entertainment", 12, 30),
-            ("McDonald's", "Food", 7, 22), ("Gojek", "Transport", 10, 30),
-            ("Lazada", "Shopping", 15, 80), ("Cathay", "Entertainment", 12, 28),
+        monthly_service_amounts = {
+            "subscriptions-streaming-subscription": ["15.98", "15.98", "15.98", "15.98"],
+            "bills-electricity-bill": ["96.20", "101.40", "99.80", "102.00"],
+            "bills-mobile-phone-bill": ["48.00", "48.00", "48.00", "48.00"],
+            "home-home-cleaning-plan": ["32.00", "32.00", "32.00", "32.00"],
+        }
+        ordinary_slugs = [
+            "food-drinks-chicken-rice", "food-drinks-bubble-tea", "food-drinks-iced-latte",
+            "transport-mrt-trip", "transport-bus-trip", "transport-private-hire-ride",
+            "groceries-fresh-eggs", "groceries-fresh-milk", "groceries-wholemeal-bread",
+            "healthcare-daily-vitamins", "education-online-course",
+            "entertainment-cinema-ticket", "shopping-basic-t-shirt", "shopping-wireless-headphones",
         ]
 
-        # TODO-FYP-TWEAK: Replace or expand these generated sample transactions for your evaluation scenarios.
+        # TODO-FYP-TWEAK: Adjust generated sample volume and scenarios for the final evaluation.
         for month_index, month_start in enumerate(month_starts):
-            for merchant, payment_type, amounts in recurring:
-                self._create(user, merchant, Decimal(str(amounts[month_index])), payment_type, month_start + timedelta(days=2, hours=9))
-            for index, (merchant, payment_type, low, high) in enumerate(variable):
-                amount = Decimal(str(round(random.uniform(low, high), 2)))
-                happened = month_start + timedelta(days=4 + index, hours=10 + index % 8, minutes=index * 2)
-                self._create(user, merchant, amount, payment_type, happened)
+            is_current_month = month_index == len(month_starts) - 1
+            for service_index, item_slug in enumerate(monthly_service_slugs):
+                happened = (
+                    self._current_month_time(month_start, now, service_index)
+                    if is_current_month
+                    else month_start + timedelta(days=2 + service_index, hours=9)
+                )
+                self._create(
+                    user, visa, catalogue[item_slug],
+                    Decimal(monthly_service_amounts[item_slug][month_index]),
+                    happened,
+                )
+            for index, item_slug in enumerate(ordinary_slugs):
+                item = catalogue[item_slug]
+                quantity = 1 + ((index + month_index) % 2 if item.allows_quantity and index % 4 == 0 else 0)
+                amount = item.unit_price * quantity if item.allows_quantity else item.unit_price
+                happened = (
+                    self._current_month_time(month_start, now, 4 + index)
+                    if is_current_month
+                    else month_start + timedelta(days=7 + index, hours=10 + index % 8, minutes=index * 2)
+                )
+                self._create(user, visa, item, amount, happened, quantity=quantity)
 
-        # Explicit alert scenarios in the current month.
-        duplicate_time = month_starts[-1] + timedelta(days=22, hours=18)
-        self._create(user, "SP Group", Decimal("102.00"), "Bill", duplicate_time)
-        self._create(user, "SP Group", Decimal("101.50"), "Bill", duplicate_time + timedelta(minutes=3))
-        self._create(user, "SP Group", Decimal("350.00"), "Bill", month_starts[-1] + timedelta(days=23, hours=9))
-        self._create(user, "Orchard Bespoke Tech", Decimal("1250.00"), "Others", month_starts[-1] + timedelta(days=24, hours=14))
+        # Explicit current-month awareness scenarios.
+        duplicate_time = self._current_month_time(month_starts[-1], now, 20)
+        electricity = catalogue["bills-electricity-bill"]
+        self._create(user, visa, electricity, Decimal("102.00"), duplicate_time)
+        self._create(user, visa, electricity, Decimal("101.50"), duplicate_time + timedelta(minutes=3))
+        self._create(
+            user, visa, electricity, Decimal("350.00"),
+            self._current_month_time(month_starts[-1], now, 22),
+        )
+        self._create(
+            user, visa, None, Decimal("180.00"),
+            self._current_month_time(month_starts[-1], now, 23),
+            merchant="Orchard Bespoke Tech",
+            payment_type=Transaction.PaymentType.OTHERS,
+            description="CUSTOM TECHNOLOGY SERVICE",
+        )
+        self._create(
+            user, visa, None, Decimal("34.80"),
+            self._current_month_time(month_starts[-1], now, 24),
+            merchant="Grab",
+            payment_type=Transaction.PaymentType.OTHERS,
+            description="GRAB AIRPORT RIDE",
+        )
 
-        # Raise current Entertainment spending relative to the previous month.
-        for day in range(20, 25):
-            self._create(user, "Cathay", Decimal("42.00"), "Entertainment", month_starts[-1] + timedelta(days=day, hours=20))
+        # Increase current entertainment spending relative to the prior month.
+        cinema = catalogue["entertainment-cinema-ticket"]
+        for offset in range(5):
+            self._create(
+                user, visa, cinema, Decimal("45.00"),
+                self._current_month_time(month_starts[-1], now, 25 + offset),
+                quantity=3,
+            )
 
-        bills = refresh_recurring_bills(user)
+        # TODO-FYP-TWEAK: This is sample data only; users can replace it from the dashboard.
+        MonthlyBudget.objects.update_or_create(
+            user=user,
+            month=month_starts[0].date(),
+            defaults={"amount": Decimal("3000.00")},
+        )
+
         count = Transaction.objects.filter(user=user).count()
         self.stdout.write(self.style.SUCCESS(
-            f"Seeded {count} transactions, {bills.count()} recurring bills, and {user.alerts.count()} alerts."
+            f"Seeded {len(browse_categories)} browse categories, {len(catalogue)} items, 3 payment methods, "
+            f"{count} transactions, and {user.alerts.count()} alerts."
         ))
         self.stdout.write("Demo login: demo / demo12345")
 
@@ -150,19 +320,57 @@ class Command(BaseCommand):
         return value.replace(year=year, month=month_zero + 1, day=1, hour=0, minute=0)
 
     @staticmethod
-    def _create(user, merchant, amount, payment_type, happened):
-        result = categorise_transaction(merchant, payment_type, "Demo transaction")
-        item = Transaction.objects.create(
+    def _current_month_time(month_start, now, slot, total_slots=36):
+        """Spread demo payments before now, never into the future."""
+        elapsed = now - month_start
+        return month_start + elapsed * ((slot + 1) / (total_slots + 1))
+
+    @staticmethod
+    def _create(
+        user, payment_method, item, amount, happened, quantity=1,
+        merchant="", payment_type=Transaction.PaymentType.OTHERS, description="",
+    ):
+        if item:
+            merchant = item.merchant_name
+            payment_type = payment_type_for_item(item)
+            item_name = item.name
+            description = f"{item.merchant_name} {item.name} {item.transaction_description}".upper()
+        else:
+            item_name = ""
+        bank_transaction_type = bank_transaction_type_for_payment(
+            payment_method, payment_type
+        )
+        result = categorise_transaction(
+            merchant,
+            payment_type,
+            "Seeded demo transaction",
+            item_name=item_name,
+            transaction_description=description,
+            amount=amount,
+            transaction_date=happened,
+            transaction_type=bank_transaction_type,
+        )
+        transaction = Transaction.objects.create(
             user=user,
+            catalogue_item=item,
+            item_name=item_name,
+            quantity=quantity,
+            unit_price=item.unit_price if item and item.allows_quantity else None,
             merchant_name=merchant,
             amount=amount,
             transaction_date=happened,
             payment_type=payment_type,
-            note="Demo transaction",
+            bank_transaction_type=bank_transaction_type,
+            payment_method=payment_method,
+            transaction_description=description,
+            note="Seeded demo transaction",
             predicted_category=result.category,
             final_category=result.category,
             confidence_score=result.confidence,
             category_explanation=result.explanation,
+            categorisation_source=result.source,
+            # Evaluation label only; this was not passed into the classifier.
+            ground_truth_category=item.ground_truth_category if item else None,
         )
-        generate_alerts(item)
-        return item
+        generate_alerts(transaction)
+        return transaction

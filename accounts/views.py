@@ -7,7 +7,6 @@ from analytics.services.dashboard import (
     get_alert_summary,
     get_category_breakdown,
     get_monthly_total,
-    get_recurring_bills,
 )
 from .forms import RegistrationForm
 
@@ -31,6 +30,5 @@ def home(request):
         "monthly_total": get_monthly_total(request.user, month),
         "top_category": breakdown[0] if breakdown else None,
         "alert_summary": get_alert_summary(request.user),
-        "recurring_count": len(get_recurring_bills(request.user)),
     }
     return render(request, "home.html", context)

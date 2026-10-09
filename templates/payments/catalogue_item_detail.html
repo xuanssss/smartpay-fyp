@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}{{ item.name }} · SmartPay{% endblock %}
+{% block content %}
+<div class="narrow-page">
+  <a class="back-link" href="{% url 'create_payment' %}?category={{ browse_group.slug }}">← Back to {{ browse_group.label }}</a>
+  <header class="item-header"><div><p class="page-kicker">{{ browse_group.label }}</p><h1>{{ item.name }}</h1><p>{{ item.merchant_name }}</p></div></header>
+  <section class="flat-panel purchase-panel" data-unit-price="{{ item.unit_price }}" data-variable="{{ item.allows_quantity|yesno:'false,true' }}">
+    <div class="purchase-summary"><div><span>Provider</span><strong>{{ item.merchant_name }}</strong></div><div><span>{% if item.allows_quantity %}Unit price{% else %}Suggested amount{% endif %}</span><strong>S${{ item.unit_price|floatformat:2 }}</strong></div></div>
+    {% if not has_methods %}<div class="method-warning"><strong>Add a payment method first.</strong><span>You need an active payment method before purchasing.</span><a href="{% url 'add_payment_method' %}?next={{ request.path|urlencode }}">Add payment method</a></div>{% endif %}
+    <form method="post" id="purchase-form" novalidate>{% csrf_token %}
+      {{ form.submission_token }}
+      {% for error in form.non_field_errors %}<div class="form-error">{{ error }}</div>{% endfor %}
+      {% if item.allows_quantity %}<div class="form-field"><label for="{{ form.quantity.id_for_label }}">Quantity</label>{{ form.quantity }}{% for error in form.quantity.errors %}<small class="text-danger">{{ error }}</small>{% endfor %}<small class="form-help">Choose {{ item.minimum_quantity }}–{{ item.maximum_quantity }}</small></div>{% else %}<div class="form-field"><label for="{{ form.amount.id_for_label }}">Payment amount</label><div class="input-group"><span class="input-group-text">S$</span>{{ form.amount }}</div>{% for error in form.amount.errors %}<small class="text-danger">{{ error }}</small>{% endfor %}</div>{% endif %}
+      <div class="form-field"><label for="{{ form.payment_method.id_for_label }}">Select a payment method</label>{{ form.payment_method }}{% for error in form.payment_method.errors %}<small class="text-danger">{{ error }}</small>{% endfor %}<small class="form-help">No full card number or bank credentials are stored.</small></div>
+      <div class="purchase-total"><span>Total</span><strong id="purchase-total">S${{ item.unit_price|floatformat:2 }}</strong></div>
+      <button class="btn btn-primary btn-lg w-100" type="submit" {% if not has_methods %}disabled{% endif %}>Purchase</button>
+      <p class="checkout-disclaimer">No real money is transferred.</p>
+    </form>
+  </section>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(() => {
+  const panel = document.querySelector('.purchase-panel');
+  const form = document.getElementById('purchase-form');
+  const total = document.getElementById('purchase-total');
+  const unit = Number(panel.dataset.unitPrice);
+  const quantity = document.getElementById('id_quantity');
+  const amount = document.getElementById('id_amount');
+  const update = () => { const value = quantity ? unit * Number(quantity.value || 0) : Number(amount.value || 0); total.textContent = `S$${value.toFixed(2)}`; };
+  if (quantity) quantity.addEventListener('input', update);
+  if (amount) amount.addEventListener('input', update);
+  update();
+  form.addEventListener('submit', () => { const button = form.querySelector('button[type="submit"]'); if (!button.disabled) { button.disabled = true; button.textContent = 'Purchasing…'; } });
+})();
+</script>
+{% endblock %}

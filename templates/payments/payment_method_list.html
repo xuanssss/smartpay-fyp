@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Payment methods · SmartPay{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div><p class="page-kicker">Your wallet</p><h1>Payment methods</h1><p>Choose how you would like to pay.</p></div>
+  <a class="btn btn-primary" href="{% url 'add_payment_method' %}">Add method</a>
+</header>
+<p class="awareness-note">Only a display label, optional last four digits, and optional expiry are stored. Never enter real payment credentials.</p>
+<section class="payment-method-list">
+{% for method in payment_methods %}
+  <article class="flat-panel payment-method-row {% if not method.is_active %}payment-method-inactive{% endif %}">
+    <span class="method-mark">{% if method.is_card %}▰{% else %}◇{% endif %}</span>
+    <div class="method-copy">
+      <div><strong>{{ method.safe_display }}</strong>{% if method.is_default and method.is_active %}<span class="default-chip">Default</span>{% endif %}{% if not method.is_active %}<span class="inactive-chip">Inactive</span>{% endif %}</div>
+      <small>{% if method.method_type == "Simulated Bank Account" %}Bank Account{% else %}{{ method.method_type }}{% endif %}{% if method.is_card and method.expiry_month %} · Expires {{ method.expiry_month|stringformat:"02d" }}/{{ method.expiry_year }}{% endif %}</small>
+    </div>
+    {% if method.is_active %}
+    <div class="method-actions">
+      {% if not method.is_default %}<form method="post" action="{% url 'set_default_payment_method' method.pk %}">{% csrf_token %}<button class="btn btn-sm btn-outline-primary" type="submit">Make default</button></form>{% endif %}
+      <form method="post" action="{% url 'deactivate_payment_method' method.pk %}">{% csrf_token %}<button class="btn btn-sm btn-link" type="submit">Remove</button></form>
+    </div>
+    {% endif %}
+  </article>
+{% empty %}
+  <div class="flat-panel empty-state"><span class="empty-icon">◇</span><h2>No payment methods</h2><p>Add a payment method before making a purchase.</p><a class="btn btn-primary" href="{% url 'add_payment_method' %}">Add payment method</a></div>
+{% endfor %}
+</section>
+{% endblock %}

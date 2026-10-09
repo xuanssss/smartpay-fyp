@@ -1,40 +1,47 @@
 {% extends "base.html" %}
 {% block title %}{{ transaction.merchant_name }} · SmartPay{% endblock %}
 {% block content %}
-<a class="back-link" href="{% url 'transaction_history' %}">‹ Back to transactions</a>
-<section class="detail-hero mt-3 mb-4 text-center">
-  <div class="merchant-avatar merchant-avatar-lg mx-auto">{{ transaction.merchant_name|first|upper }}</div>
-  <h1 class="h3 fw-bold mt-3 mb-1">{{ transaction.merchant_name }}</h1>
-  <div class="display-6 fw-bold">S${{ transaction.amount|floatformat:2 }}</div>
-  <p class="text-secondary mb-0">{{ transaction.transaction_date|date:"j F Y, g:i A" }}</p>
-</section>
+<a class="back-link" href="{% url 'transaction_history' %}">← Transactions</a>
+<header class="payment-header">
+  <div class="d-flex align-items-center gap-3"><span class="merchant-avatar merchant-avatar-lg">{{ transaction.merchant_name|first|upper }}</span><div><p class="page-kicker mb-1">Payment details</p><h1>{{ transaction.merchant_name }}</h1><p>{{ transaction.transaction_date|date:"j F Y, g:i A" }}</p></div></div>
+  <strong class="payment-total">S${{ transaction.amount|floatformat:2 }}</strong>
+</header>
+
 <div class="row g-4">
   <div class="col-lg-7">
-    <div class="card content-card mb-4"><div class="card-body p-4">
-      <div class="detail-row"><span>Payment type</span><strong>{{ transaction.payment_type }}</strong></div>
-      <div class="detail-row"><span>Predicted category</span><strong>{{ transaction.predicted_category.name }}</strong></div>
-      <div class="detail-row"><span>Final category</span><strong>{{ transaction.final_category.name }}</strong></div>
-      <div class="detail-row"><span>Confidence score</span><strong>{{ transaction.confidence_score|floatformat:2 }} / 1.00</strong></div>
-      <div class="detail-row"><span>Confidence</span><span class="confidence confidence-{{ transaction.confidence_label|lower }}">{{ transaction.confidence_label }}</span></div>
-      <div class="detail-row"><span>User corrected</span><strong>{{ transaction.user_corrected|yesno:"Yes,No" }}</strong></div>
-      {% if transaction.note %}<div class="detail-row"><span>Note</span><strong>{{ transaction.note }}</strong></div>{% endif %}
-      <a class="btn btn-outline-primary w-100 mt-3" href="{% url 'change_category' transaction.pk %}">Change category</a>
-    </div></div>
-    <div class="card content-card" id="reason"><div class="card-body p-4">
-      <p class="eyebrow text-primary mb-2">Why this category?</p>
-      <h2 class="h5">Reason</h2><p class="mb-3">{{ transaction.category_explanation }}</p>
-      <div class="soft-note"><strong>Confidence: {{ transaction.confidence_label }}</strong><br><span class="small">Confidence describes how strongly the available information supported this suggestion.</span></div>
-    </div></div>
+    <section class="flat-panel mb-4">
+      <div class="section-heading"><h2>Overview</h2><a href="{% url 'change_category' transaction.pk %}">Change category</a></div>
+      <dl class="detail-list">
+        {% if transaction.item_name %}<div><dt>Purchased item</dt><dd>{{ transaction.item_name }}</dd></div>{% endif %}
+        {% if transaction.catalogue_item and transaction.catalogue_item.allows_quantity %}
+        <div><dt>Quantity</dt><dd>{{ transaction.quantity }}</dd></div>
+        <div><dt>Unit price</dt><dd>S${{ transaction.unit_price|floatformat:2 }}</dd></div>
+        {% elif transaction.quantity > 1 %}<div><dt>Quantity</dt><dd>{{ transaction.quantity }}</dd></div>{% endif %}
+        {% if transaction.transaction_description %}<div><dt>Transaction description</dt><dd>{{ transaction.transaction_description }}</dd></div>{% endif %}
+        <div><dt>Payment type</dt><dd>{{ transaction.payment_type }}</dd></div>
+        <div><dt>Bank transaction type</dt><dd>{{ transaction.get_bank_transaction_type_display }} ({{ transaction.bank_transaction_type }})</dd></div>
+        <div><dt>Payment method</dt><dd>{% if transaction.payment_method %}{{ transaction.payment_method.safe_display }}{% else %}Not recorded (legacy payment){% endif %}</dd></div>
+        <div><dt>Predicted category</dt><dd>{{ transaction.predicted_category.name }}</dd></div>
+        <div><dt>Final category</dt><dd>{{ transaction.final_category.name }}</dd></div>
+        <div><dt>Categorisation source</dt><dd>{{ transaction.categorisation_source }}</dd></div>
+        <div><dt>Confidence</dt><dd><span class="confidence confidence-{{ transaction.confidence_label|lower }}">{{ transaction.confidence_label }}</span> <small>{{ transaction.confidence_score|floatformat:2 }} / 1.00</small></dd></div>
+        <div><dt>Manually corrected</dt><dd>{{ transaction.user_corrected|yesno:"Yes,No" }}</dd></div>
+        {% if transaction.note %}<div><dt>Note</dt><dd>{{ transaction.note }}</dd></div>{% endif %}
+      </dl>
+    </section>
+    <section class="flat-panel" id="reason">
+      <div class="section-heading"><div><p class="page-kicker">Explanation</p><h2>Why this category?</h2></div></div>
+      <p class="reason-copy">{{ transaction.category_explanation }}</p>
+      <p class="muted-note"><strong>{{ transaction.confidence_label }} confidence.</strong> Confidence describes how strongly the available information supported this suggestion.</p>
+    </section>
   </div>
   <div class="col-lg-5">
-    <div class="card content-card"><div class="card-body p-4">
-      <h2 class="h5 fw-bold">Needs attention</h2>
-      {% for alert in transaction.alerts.all %}
-        <div class="alert-item border-start border-4 {% if alert.severity == 'High' %}border-danger{% elif alert.severity == 'Medium' %}border-warning{% else %}border-info{% endif %}">
-          <strong>{{ alert.title }}</strong><div class="small text-secondary mt-1">{{ alert.message }}</div><span class="badge text-bg-light mt-2">{{ alert.status }}</span>
-        </div>
-      {% empty %}<p class="text-secondary mb-0">No alerts are linked to this payment.</p>{% endfor %}
-    </div></div>
+    <section class="flat-panel">
+      <div class="section-heading"><h2>Needs attention</h2><a href="{% url 'alert_list' %}">All alerts</a></div>
+      <div class="compact-alert-list">
+      {% for alert in transaction.alerts.all %}<article><span class="severity-dot severity-dot-{{ alert.severity|lower }}"></span><div><strong>{{ alert.title }}</strong><p>{{ alert.message }}</p><small>{{ alert.status }}</small></div></article>{% empty %}<p class="empty-copy compact">No alerts are linked to this payment.</p>{% endfor %}
+      </div>
+    </section>
   </div>
 </div>
 {% endblock %}

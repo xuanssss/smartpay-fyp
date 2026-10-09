@@ -7,7 +7,7 @@ from django.core.exceptions import ValidationError
 class EmailOrUsernameAuthenticationForm(AuthenticationForm):
     username = forms.CharField(
         label="Email or username",
-        widget=forms.TextInput(attrs={"autofocus": True, "placeholder": "demo"}),
+        widget=forms.TextInput(attrs={"autofocus": True, "placeholder": "Username or email"}),
     )
 
     def clean(self):

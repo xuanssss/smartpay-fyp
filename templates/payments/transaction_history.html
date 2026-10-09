@@ -1,34 +1,32 @@
 {% extends "base.html" %}
 {% block title %}Transactions · SmartPay{% endblock %}
 {% block content %}
-<div class="d-flex align-items-end justify-content-between gap-3 mb-4">
-  <div><p class="eyebrow text-primary mb-1">Payment activity</p><h1 class="h2 fw-bold mb-0">Transactions</h1></div>
-  <a class="btn btn-primary" href="{% url 'create_payment' %}">＋ Pay</a>
-</div>
-<div class="vstack gap-3">
+<header class="page-header">
+  <div><p class="page-kicker">Activity</p><h1>Transactions</h1><p>Payments are ordered from newest to oldest.</p></div>
+  <a class="btn btn-primary" href="{% url 'create_payment' %}">New payment</a>
+</header>
+
+<section class="flat-panel transaction-panel">
 {% for item in transactions %}
-  <article class="card content-card transaction-card">
-    <div class="card-body p-3 p-md-4">
-      <div class="d-flex justify-content-between gap-3">
-        <div class="d-flex gap-3 min-w-0">
-          <div class="merchant-avatar">{{ item.merchant_name|first|upper }}</div>
-          <div class="min-w-0">
-            <h2 class="h6 fw-bold text-truncate mb-1">{{ item.merchant_name }}</h2>
-            <div class="text-secondary small">{{ item.transaction_date|date:"j M Y, g:i A" }}</div>
-            <div class="mt-2"><span class="category-pill">{{ item.final_category.name }}</span> <span class="confidence confidence-{{ item.confidence_label|lower }}">{{ item.confidence_label }} confidence</span>{% if item.alerts.count %} <span class="badge text-bg-warning">{{ item.alerts.count }} alert{{ item.alerts.count|pluralize }}</span>{% endif %}</div>
-          </div>
-        </div>
-        <strong class="text-nowrap">S${{ item.amount|floatformat:2 }}</strong>
-      </div>
-      <div class="d-flex flex-wrap gap-2 mt-3 pt-3 border-top">
-        <a class="btn btn-sm btn-light" href="{% url 'transaction_detail' item.pk %}#reason">View reason</a>
-        <a class="btn btn-sm btn-light" href="{% url 'change_category' item.pk %}">Change category</a>
-        <a class="btn btn-sm btn-outline-primary ms-auto" href="{% url 'transaction_detail' item.pk %}">View details</a>
-      </div>
+  <article class="transaction-row">
+    <a class="transaction-main" href="{% url 'transaction_detail' item.pk %}">
+      <span class="merchant-avatar">{{ item.merchant_name|first|upper }}</span>
+      <span class="transaction-copy">
+        <strong>{{ item.item_name|default:item.merchant_name }}</strong>
+        <small>{% if item.item_name %}{{ item.merchant_name }} · {% endif %}{{ item.transaction_date|date:"j M Y, g:i A" }} · {{ item.final_category.name }}</small>
+        {% if item.quantity > 1 %}<small>Quantity {{ item.quantity }}{% if item.unit_price %} × S${{ item.unit_price|floatformat:2 }}{% endif %}</small>{% endif %}
+        {% if not item.item_name and item.transaction_description %}<small>{{ item.transaction_description|truncatechars:64 }}</small>{% endif %}
+      </span>
+      <span class="transaction-amount"><strong>S${{ item.amount|floatformat:2 }}</strong><small class="confidence-text confidence-{{ item.confidence_label|lower }}">{{ item.confidence_label }} confidence</small></span>
+    </a>
+    <div class="transaction-meta">
+      <span>{% if item.user_corrected %}Category corrected{% else %}Automatically categorised{% endif %}{% if item.payment_method %} · {{ item.payment_method.safe_display }}{% endif %}</span>
+      {% if item.alerts.count %}<span class="inline-alert">{{ item.alerts.count }} alert{{ item.alerts.count|pluralize }}</span>{% endif %}
+      <div class="transaction-links"><a href="{% url 'transaction_detail' item.pk %}#reason">Reason</a><a href="{% url 'change_category' item.pk %}">Change category</a><a href="{% url 'transaction_detail' item.pk %}">Details</a></div>
     </div>
   </article>
 {% empty %}
-  <div class="empty-state"><div class="empty-icon">↗</div><h2 class="h5">No payments yet</h2><p class="text-secondary">Create a simulated payment to see categorisation in action.</p><a class="btn btn-primary" href="{% url 'create_payment' %}">Make your first payment</a></div>
+  <div class="empty-state"><span class="empty-icon">＋</span><h2>No payments yet</h2><p>Make your first payment to see it here.</p><a class="btn btn-primary" href="{% url 'create_payment' %}">Make a payment</a></div>
 {% endfor %}
-</div>
+</section>
 {% endblock %}
