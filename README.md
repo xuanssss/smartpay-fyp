@@ -2,7 +2,7 @@
 
 A mobile-first Django Final Year Project prototype that joins simulated bill payments with explainable smart categorisation, spending analytics, and friendly needs-attention alerts.
 
-> This is a simulation for demonstration and evaluation. It does not move money, connect to a bank, or make definitive fraud decisions.
+This is a simulation for demonstration and evaluation. It does not move money, connect to a bank, or make definitive fraud decisions.
 
 ## Problem statement
 
