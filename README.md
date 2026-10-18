@@ -153,7 +153,7 @@ accounts/                 authentication and home page
 payments/                 transaction models, forms, views, categorisation, ML, commands
 analytics/                dashboard analytics, budgets, and performance logs
 alerts/                   alert model, rules, status workflow
-data/                     MoneyVis cleaning, quality-check, feature, and ML research artefacts
+data/                     training dataset
 models/                   evaluated classifier committed for deployment
 templates/                mobile-first Django templates
 static/css/               interface styling
