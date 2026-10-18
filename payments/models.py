@@ -238,7 +238,6 @@ class Transaction(models.Model):
 
     @property
     def confidence_label(self):
-        # TODO-FYP-TWEAK: Adjust confidence thresholds after evaluating the classifier.
         if self.confidence_score >= 0.85:
             return "High"
         if self.confidence_score >= 0.60:

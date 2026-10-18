@@ -525,7 +525,6 @@ def get_month_alerts(user, month, status=None, limit=None):
 
 def get_smart_insights(user, month, budget_summary=None, limit=4):
     """Create explainable insights solely from saved budgets and transaction data."""
-    # TODO-FYP-TWEAK: Review the insight mix and display limit after user evaluation.
     month = _month_start(month)
     budget_summary = budget_summary or get_budget_summary(user, month)
     insights = []

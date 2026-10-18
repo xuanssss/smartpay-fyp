@@ -3,8 +3,6 @@ from django.db.models import Q
 from payments.models import BrowseCategory, CatalogueItem, Transaction
 
 
-# TODO-FYP-TWEAK: Keep these browse groups small. They organise the catalogue
-# only and are never supplied to the financial categorisation result.
 CATALOGUE_GROUPS = (
     {
         "slug": "food",

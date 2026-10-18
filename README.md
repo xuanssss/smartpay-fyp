@@ -43,7 +43,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 python manage.py migrate
-python manage.py train_transaction_model
+python manage.py evaluate_transaction_model
 python manage.py seed_demo_data
 python manage.py runserver
 ```
@@ -55,7 +55,7 @@ py -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 python manage.py migrate
-python manage.py train_transaction_model
+python manage.py evaluate_transaction_model
 python manage.py seed_demo_data
 python manage.py runserver
 ```
@@ -71,7 +71,7 @@ Running `seed_demo_data` is safe to repeat. It refreshes the demo user's transac
 
 ## ML training and evaluation
 
-The labelled model dataset is `data/moneyvis_singapore_quality_checked.csv`. A reproducible stratified 80/20 split is used with random seed 42. New payments first pass through a deliberately small, reviewable set of high-confidence domain rules in `payments/services/domain_rules.py`. These rules describe reusable merchant families and contextual patterns rather than individual transactions: stable merchants such as Amazon or FairPrice can map directly, while multi-service merchants such as Grab or Gojek require explicit food or ride wording. Ambiguous and unmatched payments are passed to the saved linear SVM. There are no broad payment-type or `Other` fallbacks, and legacy database `MerchantRule` rows are not used. The model must therefore be trained before unmatched payments or demo transactions are created.
+The labelled model dataset is `data/moneyvis_singapore_quality_checked.csv`. A reproducible stratified 80/20 split is used with random seed 42. New payments first pass through a deliberately small, reviewable set of high-confidence domain rules in `payments/services/domain_rules.py`. These rules describe reusable merchant families and contextual patterns rather than individual transactions: stable merchants such as Amazon or FairPrice can map directly, while multi-service merchants such as Grab or Gojek require explicit food or ride wording. Ambiguous and unmatched payments are passed to the committed linear SVM in `models/transaction_classifier.joblib`. There are no broad payment-type or `Other` fallbacks, and legacy database `MerchantRule` rows are not used. Initial setup and deployment validate this committed classifier rather than retraining it.
 
 The ML dependency versions are pinned in `requirements.txt`. Each trained model
 also records its scikit-learn, SciPy, NumPy, pandas, and joblib versions in the
@@ -79,13 +79,13 @@ saved metadata so a deployed model can be traced to its training environment.
 
 The separate MoneyVis research-cleaning workflow lives in `data/moneyvis_data_cleaning.ipynb`. It rebuilds 3,859 cleaned debit-expense records across 18 mapped categories directly from the original workbook, including Mortgage and Rent records mapped to `Housing` and excluding all `FEE` transactions. It writes a full auditable dataset to `data/moneyvis_cleaned_debit_purchases.csv` and a reduced synthesis input containing five substantive fields plus a non-model mapping identifier to `data/moneyvis_synthesis_input.csv`. The final Singapore-localised output is `data/moneyvis_singapore_quality_checked.csv`; its `source_row_id` preserves one-to-one traceability to the synthesis input. Reproducible structural and description-quality checks are contained in `data/moneyvis_synthesis_quality_check.ipynb`. The train-only word TF-IDF, character TF-IDF, category lexicon, SGD amount-percentile, day-bucket and one-hot transformations are implemented in `payments/services/ml_features.py` and demonstrated in `data/moneyvis_feature_engineering.ipynb`. The reproducible SVM experiment and per-category results are recorded in `data/moneyvis_machine_learning.ipynb`. The current workflow does not generate a separate Singapore benchmark.
 
-Train and save the model:
+Retrain and replace the committed model after changing the dataset, feature pipeline, classifier, or pinned ML dependencies:
 
 ```bash
 python manage.py train_transaction_model
 ```
 
-This writes `models/transaction_classifier.joblib`. The saved bundle contains the fitted word and character TF-IDF vocabularies, category lexicons, SGD amount-percentile boundaries, day buckets, one-hot encoders, and SVM. App inference therefore uses the exact transformations fitted during training. The command prints:
+This command is not required for ordinary setup or deployment. It writes `models/transaction_classifier.joblib`, which must be reviewed and committed together with the related dataset or code change. The saved bundle contains the fitted word and character TF-IDF vocabularies, category lexicons, SGD amount-percentile boundaries, day buckets, one-hot encoders, and SVM. App inference therefore uses the exact transformations fitted during training. The command prints:
 
 - Accuracy
 - Macro-averaged precision
@@ -127,13 +127,13 @@ memory-conscious configuration for Render's 512 MB free instance. WhiteNoise
 serves collected static files. Local development continues to use SQLite when
 `DATABASE_URL` is not set.
 
-1. Push the project to a Git repository, including the labelled CSV used by
-   `train_transaction_model`.
+1. Push the project to a Git repository, including the labelled CSV and the
+   evaluated `models/transaction_classifier.joblib` bundle.
 2. In Render, create a new Blueprint and select the repository.
 3. Apply the resources described by `render.yaml`.
 4. Wait for the build to migrate the database, validate the committed
-   classifier and its dependency versions, seed the demo account only if it is
-   missing, and collect static files.
+   classifier against the labelled dataset and pinned dependency versions,
+   seed the demo account only if it is missing, and collect static files.
 5. Open the generated Render URL and log in with the demo account above.
 
 Render generates the production secret key and supplies `DATABASE_URL` and

@@ -29,7 +29,6 @@ CATEGORIES = PURCHASE_CATEGORY_DESCRIPTIONS
 
 # A browse category is navigation only and is intentionally separate from the
 # financial Category prediction.
-# TODO-FYP-TWEAK: Rename, reorder, or replace catalogue browse categories.
 BROWSE_CATEGORIES = [
     ("Food", "food-drinks", "Meals and drinks", "🍜"),
     ("Transport", "transport", "Trips and transport value", "🚆"),
@@ -47,7 +46,6 @@ BROWSE_CATEGORIES = [
 
 # name, merchant, raw transaction description, price, financial ground truth,
 # allows quantity, icon. There are five items in every browse category.
-# TODO-FYP-TWEAK: Replace catalogue items and prices with the final demo set.
 CATALOGUE_ITEMS = {
     "food-drinks": [
         ("Chicken Rice", "Koufu", "CHICKEN RICE MEAL", "5.80", "Dining", True, "🍚"),
@@ -241,7 +239,6 @@ class Command(BaseCommand):
             "entertainment-cinema-ticket", "shopping-basic-t-shirt", "shopping-wireless-headphones",
         ]
 
-        # TODO-FYP-TWEAK: Adjust generated sample volume and scenarios for the final evaluation.
         for month_index, month_start in enumerate(month_starts):
             is_current_month = month_index == len(month_starts) - 1
             for service_index, item_slug in enumerate(monthly_service_slugs):
@@ -299,7 +296,6 @@ class Command(BaseCommand):
                 quantity=3,
             )
 
-        # TODO-FYP-TWEAK: This is sample data only; users can replace it from the dashboard.
         MonthlyBudget.objects.update_or_create(
             user=user,
             month=month_starts[0].date(),

@@ -29,7 +29,6 @@ def generate_alerts(transaction):
     prior = Transaction.objects.filter(user=transaction.user).exclude(pk=transaction.pk)
     merchant_prior = prior.filter(merchant_name__iexact=transaction.merchant_name)
 
-    # TODO-FYP-TWEAK: Alert thresholds: five minutes and a less-than-5% amount difference.
     nearby = merchant_prior.filter(
         transaction_date__gte=transaction.transaction_date - timedelta(minutes=5),
         transaction_date__lte=transaction.transaction_date + timedelta(minutes=5),
@@ -46,7 +45,6 @@ def generate_alerts(transaction):
             break
 
     historical_amounts = [float(value) for value in merchant_prior.values_list("amount", flat=True)]
-    # TODO-FYP-TWEAK: Unusual amount threshold requires 3 prior payments and mean + 2 standard deviations.
     if len(historical_amounts) >= 3:
         deviation = stdev(historical_amounts)
         if deviation > 0 and float(transaction.amount) > mean(historical_amounts) + 2 * deviation:
@@ -58,7 +56,6 @@ def generate_alerts(transaction):
             ))
 
     user_average = prior.aggregate(value=Avg("amount"))["value"]
-    # TODO-FYP-TWEAK: An unfamiliar merchant is flagged above two times the user's prior average.
     if not merchant_prior.exists() and user_average and transaction.amount > user_average * 2:
         created.append(_add_alert(
             transaction, Alert.AlertType.UNFAMILIAR_HIGH_VALUE, Alert.Severity.HIGH,
@@ -80,7 +77,6 @@ def generate_alerts(transaction):
         user=transaction.user, final_category=transaction.final_category,
         transaction_date__year=previous_start.year, transaction_date__month=previous_start.month,
     ).aggregate(value=Sum("amount"))["value"] or Decimal("0")
-    # TODO-FYP-TWEAK: Category spending alert threshold is 50% over the previous month.
     category_title = f"High {transaction.final_category.name} spending"
     already_flagged = Alert.objects.filter(
         user=transaction.user, alert_type=Alert.AlertType.HIGH_CATEGORY,
