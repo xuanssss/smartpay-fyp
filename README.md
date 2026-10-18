@@ -1,6 +1,6 @@
 # Integrated Bill Payment App with Smart Categorization
 
-A mobile-first Django Final Year Project prototype that joins simulated bill payments with explainable smart categorisation, spending analytics, and friendly needs-attention alerts.
+A mobile-first Django Final Year Project prototype that joins simulated bill payments with explainable smart categorisation, spending analytics, and needs-attention alerts.
 
 This is a simulation for demonstration and evaluation. It does not move money, connect to a bank, or make definitive fraud decisions.
 
@@ -28,7 +28,7 @@ Payment and superapp transaction histories are often chronological lists. Users 
 
 - Python 3.11+
 - Django 5.2 LTS (the newest Django line that still supports Python 3.11)
-- SQLite
+- SQLite / PostgreSQL
 - Django templates, Bootstrap 5 CDN, and Chart.js CDN
 - pandas, NumPy, scikit-learn, and joblib
 
