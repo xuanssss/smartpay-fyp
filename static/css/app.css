@@ -349,8 +349,9 @@ a { color: var(--accent); }
 .dashboard-card-heading div > small { display: block; margin-top: 5px; color: var(--muted); font-size: .64rem; }
 .dashboard-card-heading > span { padding: 6px 9px; border-radius: 99px; background: #f4efe4; color: var(--warning); white-space: nowrap; font-size: .61rem; font-weight: 680; }
 .daily-chart-wrap { height: 270px; }
-.smart-insight-list { display: grid; gap: 18px; }
-.smart-insight-list article { padding-left: 13px; border-left: 3px solid var(--accent); }
+.insight-card { display: flex; flex-direction: column; }
+.smart-insight-list { flex: 1; display: grid; grid-auto-rows: minmax(0, 1fr); gap: 14px; }
+.smart-insight-list article { min-height: 0; display: flex; flex-direction: column; justify-content: center; padding: 12px 0 12px 13px; border-left: 3px solid var(--accent); }
 .smart-insight-list article.insight-positive { border-color: var(--success); }
 .smart-insight-list article.insight-attention { border-color: var(--danger); }
 .smart-insight-list article.insight-neutral { border-color: var(--accent); }

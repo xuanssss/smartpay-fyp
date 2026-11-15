@@ -297,8 +297,15 @@ class DashboardTests(TestCase):
         self.assertEqual(review["trend"]["values"][-1], 330.0)
         self.assertEqual(
             [milestone["key"] for milestone in review["milestones"]],
-            ["biggest-day", "busiest-day", "passed-previous", "month-total"],
+            ["biggest-day", "busiest-day", "period-comparison", "month-total"],
         )
+        comparison_moment = review["milestones"][2]
+        self.assertEqual(comparison_moment["label"], "Spending increased")
+        self.assertEqual(
+            comparison_moment["value"],
+            "725% higher than the previous month",
+        )
+        self.assertIn("previous month", comparison_moment["narrative"])
         self.assertTrue(all(milestone["story_title"] for milestone in review["milestones"]))
         self.assertEqual(review["interactions"]["cumulative_values"][-1], 330.0)
         self.assertEqual(len(review["comparisons"]), 3)

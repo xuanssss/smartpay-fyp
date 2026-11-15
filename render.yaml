@@ -21,5 +21,9 @@ services:
         generateValue: true
       - key: DEBUG
         value: "False"
+      - key: JIA_EN_DEMO_PASSWORD
+        sync: false
+      - key: JIA_EN_DEMO_AS_OF
+        value: "2026-11-15"
       - key: PYTHON_VERSION
         value: 3.13.5

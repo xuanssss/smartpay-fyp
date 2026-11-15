@@ -523,7 +523,7 @@ def get_month_alerts(user, month, status=None, limit=None):
     return queryset[:limit] if limit else queryset
 
 
-def get_smart_insights(user, month, budget_summary=None, limit=4):
+def get_smart_insights(user, month, budget_summary=None, limit=3):
     """Create explainable insights solely from saved budgets and transaction data."""
     month = _month_start(month)
     budget_summary = budget_summary or get_budget_summary(user, month)
@@ -557,26 +557,6 @@ def get_smart_insights(user, month, budget_summary=None, limit=4):
                 title = "Spending is within budget"
                 message = f"Your current pace is about S${max(difference, ZERO):,.2f} below the saved budget."
             insights.append({"tone": "positive", "title": title, "message": message})
-
-    comparison = get_period_comparison(user, month)
-    if comparison["change"] is not None and comparison["change"] > 0:
-        insights.append({
-            "tone": "attention",
-            "title": "Spending increased",
-            "message": f"You spent {comparison['change_abs']:.1f}% more than the {comparison['label']}.",
-        })
-    elif comparison["change"] is not None and comparison["change"] < 0:
-        insights.append({
-            "tone": "positive",
-            "title": "Spending decreased",
-            "message": f"You spent {comparison['change_abs']:.1f}% less than the {comparison['label']}.",
-        })
-    elif comparison["change"] == 0:
-        insights.append({
-            "tone": "neutral",
-            "title": "Spending is unchanged",
-            "message": f"Total spending matches the {comparison['label']}.",
-        })
 
     breakdown = get_category_breakdown(user, month)
     if breakdown and budget_summary["total"]:
@@ -635,6 +615,9 @@ def get_monthly_review_data(user, month, today=None):
     previous_total = sum((item.amount for item in previous_transactions), ZERO)
     previous_days = calendar.monthrange(previous_month.year, previous_month.month)[1]
     change = round(float((total - previous_total) / previous_total * 100), 1) if previous_total else None
+    period_comparison = get_period_comparison(
+        user, month, today=today, same_period=True
+    )
 
     budget_summary = get_budget_summary(user, month, today=today)
     six_months = [month_offset(month, offset) for offset in range(-5, 1)]
@@ -753,24 +736,43 @@ def get_monthly_review_data(user, month, today=None):
             f"{payment_label} happened on this day, adding {money(daily_totals[busiest_day])} to monthly spending.",
             f"{count_at(busiest_day)} payment{'s' if count_at(busiest_day) != 1 else ''} had been made by this point",
         )
-    cumulative = ZERO
-    passed_day = None
-    if previous_total and total > previous_total:
-        for day in sorted(daily_totals):
-            cumulative += daily_totals[day]
-            if cumulative > previous_total:
-                passed_day = day
-                break
-    if passed_day:
+    period_change = period_comparison["change"]
+    if latest_day and period_change is not None:
+        change_abs = period_comparison["change_abs"]
+        if period_change > 0:
+            comparison_title = "Spending increased"
+            comparison_value = (
+                f"{change_abs:g}% higher than the {period_comparison['label']}"
+            )
+            comparison_narrative = (
+                f"You spent {change_abs:g}% more than the "
+                f"{period_comparison['label']}."
+            )
+        elif period_change < 0:
+            comparison_title = "Spending decreased"
+            comparison_value = f"{change_abs:g}% less"
+            comparison_narrative = (
+                f"You spent {change_abs:g}% less than the "
+                f"{period_comparison['label']}."
+            )
+        else:
+            comparison_title = "Spending is unchanged"
+            comparison_value = "No change"
+            comparison_narrative = (
+                f"Total spending matches the {period_comparison['label']}."
+            )
         add_milestone(
-            "passed-previous",
-            passed_day,
-            f"Passed {previous_month:%B}",
-            f"Spending moved above {money(previous_total)}",
-            f"You passed {previous_month:%B}'s total",
-            money(cumulative_at(passed_day)),
-            f"Cumulative spending moved above {previous_month:%B}'s {money(previous_total)} total on this day.",
-            f"This happened on day {passed_day} of the month",
+            "period-comparison",
+            latest_day,
+            comparison_value,
+            comparison_title,
+            comparison_title,
+            comparison_value,
+            comparison_narrative,
+            (
+                f"{money(period_comparison['current_total'])} versus "
+                f"{money(period_comparison['previous_total'])}"
+            ),
         )
     if latest_day:
         add_milestone(

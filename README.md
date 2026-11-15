@@ -69,6 +69,23 @@ Open <http://127.0.0.1:8000/>.
 
 Running `seed_demo_data` is safe to repeat. It refreshes the demo user's transactions, alerts, monthly budget, password, and categories while leaving other user accounts alone. A saved budget applies from its selected month onward until the user saves another change; earlier months keep their previous amount. A user can edit or remove a budget change from Dashboard → Set/Edit budget.
 
+### Jia En presentation account
+
+The isolated Jia En scenario contains eleven complete prior months plus the current
+partial month, a S$3,000 budget, a real SVM-categorised S$350 Super Energy bill,
+and alerts produced by the normal unusual-amount and duplicate-payment rules.
+Its password is supplied through `JIA_EN_DEMO_PASSWORD` and is never committed.
+
+```bash
+export JIA_EN_DEMO_PASSWORD='choose-a-strong-presentation-password'
+python manage.py seed_jia_en_demo --as-of 2026-11-15 --dry-run
+python manage.py seed_jia_en_demo --as-of 2026-11-15 --reset
+python manage.py seed_jia_en_demo --as-of 2026-11-15 --verify-only
+```
+
+See [`docs/jia_en_demo.md`](docs/jia_en_demo.md) for the verified totals,
+3–4 minute click sequence, safety notes, deployment steps, and checklist.
+
 ## ML training and evaluation
 
 The labelled model dataset is `data/moneyvis_singapore_quality_checked.csv`. A reproducible stratified 80/20 split is used with random seed 42. New payments first pass through a deliberately small, reviewable set of high-confidence domain rules in `payments/services/domain_rules.py`. These rules describe reusable merchant families and contextual patterns rather than individual transactions: stable merchants such as Amazon or FairPrice can map directly, while multi-service merchants such as Grab or Gojek require explicit food or ride wording. Ambiguous and unmatched payments are passed to the committed linear SVM in `models/transaction_classifier.joblib`. There are no broad payment-type or `Other` fallbacks, and legacy database `MerchantRule` rows are not used. Initial setup and deployment validate this committed classifier rather than retraining it.
